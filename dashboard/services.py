@@ -24,6 +24,7 @@ USER_COLORS = ["#ff8a1f", "#42c77b", "#d9ad35", "#5ab0ff", "#e85b5b", "#b98cff",
 TFTP_IOS_URL = "http://10.101.11.48/TFTP/"
 IOS_UPLOAD_JOBS = {}
 LIVE_TOOL_JOBS = {}
+SUPPORTED_IOS_MODEL_MESSAGE = "Only Catalyst 3560, 3750, and 4948 are supported currently."
 
 ROOT_SWITCHES = [
     {"name": "Korangi", "ip": "10.101.88.56"},
@@ -520,7 +521,8 @@ def fetch_tftp_ios_options(model, current_ios, free_bytes):
         return {
             "family": "",
             "options": options,
-            "message": "Model family was not detected, so IOS files could not be filtered.",
+            "unsupported": True,
+            "message": SUPPORTED_IOS_MODEL_MESSAGE,
             "tftp_url": TFTP_IOS_URL,
         }
     try:
@@ -585,6 +587,7 @@ def fetch_tftp_ios_options(model, current_ios, free_bytes):
         current_status = "no_options"
     return {
         "family": family,
+        "unsupported": False,
         "options": default_options,
         "all_options": options,
         "current_ios_match": bool(already_current_options),

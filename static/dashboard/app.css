@@ -1972,3 +1972,46 @@ body.light-theme .live-line.plain,
 body.light-theme .live-line.config {
   color: #fff4e8;
 }
+body.light-theme .result-panel.success {
+  background: #fff8ef;
+  border-color: rgba(23, 138, 79, .42);
+}
+body.light-theme .ios-report-grid div,
+body.light-theme .switch-ios-box,
+body.light-theme .ios-decision {
+  background: #fffdf8;
+  border-color: #e2bd8b;
+  color: #20150d;
+}
+body.light-theme .ios-report-grid strong,
+body.light-theme .switch-ios-item strong,
+body.light-theme .ios-state {
+  color: #20150d;
+}
+body.light-theme .ios-report-grid span,
+body.light-theme .switch-ios-item small,
+body.light-theme .ios-phase2 p {
+  color: #705f50;
+}
+body.light-theme .switch-ios-item {
+  background: #fffaf2;
+  border-color: #e0bd8e;
+  color: #20150d;
+}
+body.light-theme .switch-ios-item.running {
+  background: rgba(23, 138, 79, .12);
+  border-color: rgba(23, 138, 79, .65);
+}
+body.light-theme .switch-ios-item.uploaded {
+  background: rgba(36, 126, 190, .12);
+  border-color: rgba(36, 126, 190, .62);
+}
+body.light-theme .ios-phase2 {
+  background: rgba(255, 122, 0, .08);
+  border-color: rgba(255, 122, 0, .42);
+}
+body.light-theme .ios-decision.error {
+  background: rgba(199, 55, 55, .08);
+  border-color: rgba(199, 55, 55, .55);
+  color: #9d2222;
+}

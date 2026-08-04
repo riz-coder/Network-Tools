@@ -213,43 +213,49 @@
           <div class="ios-phase2">
             <h3>Phase 2 - IOS Selection</h3>
             <p>{{ result.ios_report.phase2.message }}</p>
-            <label>Select IOS
-              <select data-ios-select {% if not result.ios_report.phase2.options %}disabled{% endif %}>
-                {% for ios in result.ios_report.phase2.options %}
-                  <option
-                    value="{{ ios.filename }}"
-                    data-size="{{ ios.size }}"
-                    data-size-bytes="{{ ios.size_bytes }}"
-                    data-status="{{ ios.status }}"
-                    data-kind="{{ ios.kind }}"
-                    data-current="{{ ios.already_current|yesno:'yes,no' }}"
-                    data-space="{{ ios.has_space|yesno:'yes,no' }}"
-                    data-uploaded="{{ ios.uploaded_on_switch|yesno:'yes,no' }}"
-                  >
-                    {{ ios.filename }} - {{ ios.size }}
-                  </option>
-                {% empty %}
-                  <option>No related IOS found on TFTP server</option>
-                {% endfor %}
-              </select>
-            </label>
-            <div class="ios-decision" data-ios-decision>
-              <span>Selected IOS status will appear here.</span>
-            </div>
-            <form method="post" action="{% url 'dashboard:ios_upload_start' %}" class="ios-upload-form" data-ios-upload-form data-ios-progress-form data-ios-start-url="{% url 'dashboard:ios_upload_start' %}" data-ios-status-url-template="{% url 'dashboard:ios_upload_status' 'JOB_ID' %}">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="ios_upload">
-              <input type="hidden" name="username" value="{{ defaults.username }}">
-              <input type="hidden" name="password" value="{{ defaults.password }}">
-              <input type="hidden" name="device_ip" value="{{ result.ios_report.device_ip }}">
-              <input type="hidden" name="model" value="{{ result.ios_report.model }}">
-              <input type="hidden" name="family" value="{{ result.ios_report.phase2.family }}">
-              <input type="hidden" name="free_bytes" value="{{ result.ios_report.free_bytes }}">
-              <input type="hidden" name="ios_file" data-ios-upload-file>
-              <input type="hidden" name="ios_size_bytes" data-ios-upload-size>
-              <button class="primary-button" type="submit" data-ios-upload-button>IOS Upload</button>
-            </form>
-            <div class="ios-source">Source: {{ result.ios_report.phase2.tftp_url }}{% if result.ios_report.phase2.family %} | Family: {{ result.ios_report.phase2.family }}{% endif %}</div>
+            {% if result.ios_report.phase2.unsupported %}
+              <div class="ios-decision error">
+                <span>{{ result.ios_report.phase2.message }}</span>
+              </div>
+            {% else %}
+              <label>Select IOS
+                <select data-ios-select {% if not result.ios_report.phase2.options %}disabled{% endif %}>
+                  {% for ios in result.ios_report.phase2.options %}
+                    <option
+                      value="{{ ios.filename }}"
+                      data-size="{{ ios.size }}"
+                      data-size-bytes="{{ ios.size_bytes }}"
+                      data-status="{{ ios.status }}"
+                      data-kind="{{ ios.kind }}"
+                      data-current="{{ ios.already_current|yesno:'yes,no' }}"
+                      data-space="{{ ios.has_space|yesno:'yes,no' }}"
+                      data-uploaded="{{ ios.uploaded_on_switch|yesno:'yes,no' }}"
+                    >
+                      {{ ios.filename }} - {{ ios.size }}
+                    </option>
+                  {% empty %}
+                    <option>No related IOS found on TFTP server</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <div class="ios-decision" data-ios-decision>
+                <span>Selected IOS status will appear here.</span>
+              </div>
+              <form method="post" action="{% url 'dashboard:ios_upload_start' %}" class="ios-upload-form" data-ios-upload-form data-ios-progress-form data-ios-start-url="{% url 'dashboard:ios_upload_start' %}" data-ios-status-url-template="{% url 'dashboard:ios_upload_status' 'JOB_ID' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="ios_upload">
+                <input type="hidden" name="username" value="{{ defaults.username }}">
+                <input type="hidden" name="password" value="{{ defaults.password }}">
+                <input type="hidden" name="device_ip" value="{{ result.ios_report.device_ip }}">
+                <input type="hidden" name="model" value="{{ result.ios_report.model }}">
+                <input type="hidden" name="family" value="{{ result.ios_report.phase2.family }}">
+                <input type="hidden" name="free_bytes" value="{{ result.ios_report.free_bytes }}">
+                <input type="hidden" name="ios_file" data-ios-upload-file>
+                <input type="hidden" name="ios_size_bytes" data-ios-upload-size>
+                <button class="primary-button" type="submit" data-ios-upload-button>IOS Upload</button>
+              </form>
+              <div class="ios-source">Source: {{ result.ios_report.phase2.tftp_url }}{% if result.ios_report.phase2.family %} | Family: {{ result.ios_report.phase2.family }}{% endif %}</div>
+            {% endif %}
           </div>
         </div>
       {% elif result.ios_upload %}
