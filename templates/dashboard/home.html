@@ -1,0 +1,43 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<section class="dashboard-content noc-dashboard minimal-overview">
+  <div class="connect-noc-center">
+    <div class="connect-logo-mark"><i></i></div>
+    <div class="connect-wordmark">CONNECT NOC</div>
+  </div>
+
+  <section class="mac-dashboard mac-dashboard-single" data-mac-dashboard data-mac-update-all-url="{% url 'dashboard:mac_update_all' %}">
+      <div class="mac-pie-panel">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">Root Switches</span>
+            <h3>MAC distribution</h3>
+          </div>
+        </div>
+        <div class="pie-wrap">
+            <div class="pie-chart mac-pie-chart" style="background: conic-gradient({{ mac_dashboard.pie_gradient }});">
+              <span>{{ mac_dashboard.total_display }}</span>
+              <div class="mac-slice-tooltip" data-mac-slice-tooltip></div>
+            </div>
+            {{ mac_dashboard.pie_segments|json_script:"macPieSegments" }}
+          <div class="pie-legend" data-mac-pie-legend>
+            {% if mac_dashboard.pie_segments %}
+              {% for item in mac_dashboard.pie_segments %}
+                <span title="{{ item.name }} - {{ item.count }} MACs"><i style="background: {{ item.color }}"></i>{{ item.name }} - {{ item.count }}</span>
+              {% endfor %}
+            {% else %}
+              <span><i></i>No MAC data yet</span>
+            {% endif %}
+          </div>
+        </div>
+        <form class="mac-credentials mac-update-all-form" data-mac-update-all-form>
+          {% csrf_token %}
+          <input name="mac_username" placeholder="Telnet username">
+          <input name="mac_password" type="password" placeholder="Telnet password">
+          <button class="primary-button" type="submit" data-mac-update-all>Update All Switches</button>
+        </form>
+        <div class="mac-update-status" data-mac-update-status></div>
+      </div>
+  </section>
+</section>
+{% endblock %}

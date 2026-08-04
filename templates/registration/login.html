@@ -1,0 +1,30 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login | NETWORK-TOOLS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'dashboard/app.css' %}?v=66">
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <span class="auth-title">CONNECT NOC</span>
+      <h1>Sign in to continue</h1>
+      {% if form.errors %}
+        <div class="auth-error">Invalid username or password.</div>
+      {% endif %}
+      <form method="post" class="auth-form">
+        {% csrf_token %}
+        <label>Username <input name="username" autocomplete="username" required autofocus></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary-button" type="submit">Login</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

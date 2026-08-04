@@ -1,0 +1,349 @@
+{% extends 'dashboard/base.html' %}
+{% load dashboard_extras %}
+{% block title %}{{ selected.name }} | NETWORK-TOOLS{% endblock %}
+{% block heading %}{{ selected.name }}{% endblock %}
+{% block content %}
+<section class="tool-page">
+  <div class="tool-header">
+    <h2>{{ selected.name }}</h2>
+    <p>{{ selected.description }}</p>
+  </div>
+
+  {% if active_tool == "corporate-deployment" %}
+    <div class="split-grid">
+      <form class="panel-form" method="post" data-progress-form="vlan" data-live-form data-live-start-url="{% url 'dashboard:live_tool_start' %}" data-live-status-url-template="{% url 'dashboard:live_tool_status' 'JOB_ID' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="span_vlan">
+        <h3>Span VLAN</h3>
+        <label>Username <input name="username" value="{{ defaults.username }}" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <label>VLAN ID <input name="vlan_id" value="{{ defaults.vlan_id }}" data-vlan-id required></label>
+        <div class="field-message" data-vlan-message></div>
+        <label>VLAN Name <input name="vlan_name" value="{{ defaults.vlan_name }}" required></label>
+        <div class="region-picker" data-region-picker>
+          <div class="field-heading">
+            <span>Regions</span>
+            <button class="ghost-button" type="button" data-clear-regions>Clear</button>
+          </div>
+          <div class="region-summary" data-region-summary>No region selected</div>
+          <div class="region-grid">
+            {% for region, subnet in regions.items %}
+              <label class="region-chip" data-region-chip>
+                <input type="checkbox" name="regions" value="{{ region }}" data-excludes="{{ excluded_defaults|get_item:region|join:', ' }}" {% if region in selected_regions %}checked{% endif %}>
+                <span>{{ region }}</span>
+                <small>{{ subnet }}</small>
+              </label>
+            {% endfor %}
+          </div>
+          <button class="secondary-button apply-regions-button" type="button" data-apply-regions>Apply Selected Regions</button>
+        </div>
+        <label>IPs to exclude <textarea name="exclude_ips" rows="4" placeholder="10.101.88.5, 10.101.90.10">{{ defaults.exclude_ips }}</textarea></label>
+        <button class="primary-button form-state-button invalid" type="submit" data-vlan-submit>Start VLAN Configuration</button>
+      </form>
+
+      <form class="panel-form" method="post" data-lastmile-form data-live-form data-live-start-url="{% url 'dashboard:live_tool_start' %}" data-live-status-url-template="{% url 'dashboard:live_tool_status' 'JOB_ID' %}" data-interface-url="{% url 'dashboard:lastmile_interfaces' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="apply_lastmile">
+        <h3>Last-Mile Port</h3>
+        <label>Username <input name="username" value="{{ defaults.username }}" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <label>Last-Mile Switch IP <input name="lastmile_ip" value="{{ defaults.lastmile_ip }}" data-lastmile-ip required></label>
+        <input type="hidden" name="port" value="{{ defaults.port }}" data-lastmile-port required>
+        <div class="interface-fetch-status" data-interface-status>Enter username, password, and switch IP to fetch ports.</div>
+        <div class="port-picker" data-port-picker>
+          <div class="field-heading"><span>Ports</span><span data-port-count>0 ports</span></div>
+          <div class="selected-port-label" data-selected-port>No port selected</div>
+          <div class="selected-port-info" data-selected-port-info hidden></div>
+          <div class="port-list" data-port-list>
+            <div class="empty-state">Ports will appear here after telnet fetch.</div>
+          </div>
+        </div>
+        <label>VLAN ID <input name="vlan_id" value="{{ defaults.vlan_id }}" data-lastmile-vlan-id required></label>
+        <div class="field-message" data-lastmile-vlan-message></div>
+        <label>VLAN Name <input name="vlan_name" value="{{ defaults.vlan_name }}" required></label>
+        <label>Type
+          <select name="lastmile_type" data-lastmile-type onchange="window.ntToggleLastmileType && window.ntToggleLastmileType(this)">
+            <option value="DATA" {% if defaults.lastmile_type != 'BW' %}selected{% endif %}>DATA</option>
+            <option value="BW" {% if defaults.lastmile_type == 'BW' %}selected{% endif %}>BW</option>
+          </select>
+        </label>
+        <label data-data-field>Service Policy <input name="service_policy" value="{{ defaults.service_policy|default:'5Mb' }}"></label>
+        <label data-bw-field hidden>Public IPs for BW <textarea name="public_ips" rows="3">{{ defaults.public_ips }}</textarea></label>
+        <label data-bw-field hidden>Custom ACL Name <input name="acl_name" value="{{ defaults.acl_name }}"></label>
+        <button class="primary-button form-state-button invalid" type="submit" data-lastmile-submit>Apply Last-Mile Configuration</button>
+        <button class="secondary-button" name="action" value="show_interface" type="submit">Show Final Running Config</button>
+      </form>
+    </div>
+  {% elif active_tool == "p2p-testing" %}
+    <div class="split-grid">
+      <form class="panel-form" method="post" data-p2p-form="switch" data-live-form data-live-start-url="{% url 'dashboard:live_tool_start' %}" data-live-status-url-template="{% url 'dashboard:live_tool_status' 'JOB_ID' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="p2p_test">
+        <h3>Switch to Switch</h3>
+        <label>Username <input name="username" value="{{ defaults.username }}" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <label>SW1 IP <input name="sw1_ip" value="{{ defaults.sw1_ip }}" required></label>
+        <label>SW2 IP <input name="sw2_ip" value="{{ defaults.sw2_ip }}" required></label>
+        <label>VLAN <input name="vlan_id" value="{{ defaults.vlan_id }}" required></label>
+        <label>SW1 SVI IP/CIDR <input name="sw1_interface_ip" value="{{ defaults.sw1_interface_ip }}" placeholder="192.168.20.1/30" required></label>
+        <label>SW2 SVI IP/CIDR <input name="sw2_interface_ip" value="{{ defaults.sw2_interface_ip }}" placeholder="192.168.20.2/30" required></label>
+        <label class="checkbox-row"><input type="checkbox" name="clean_up_interfaces" checked> Cleanup the SVI after test</label>
+        <div class="field-message" data-p2p-message></div>
+        <button class="primary-button form-state-button invalid" type="submit" data-p2p-submit>Run P2P Test</button>
+      </form>
+      <form class="panel-form" method="post" data-p2p-form="single" data-live-form data-live-start-url="{% url 'dashboard:live_tool_start' %}" data-live-status-url-template="{% url 'dashboard:live_tool_status' 'JOB_ID' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="single_switch_test">
+        <h3>Single Switch</h3>
+        <label>Username <input name="username" value="{{ defaults.username }}" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <label>Switch IP <input name="single_switch_ip" value="{{ defaults.single_switch_ip }}" required></label>
+        <label>VLAN <input name="vlan_id" value="{{ defaults.vlan_id }}" required></label>
+        <label>Switch SVI IP/CIDR <input name="switch_interface_ip" value="{{ defaults.switch_interface_ip }}" required></label>
+        <label>Client IP <input name="target_ip" value="{{ defaults.target_ip }}" required></label>
+        <label class="checkbox-row"><input type="checkbox" name="clean_up_interfaces" checked> Cleanup the SVI after test</label>
+        <div class="field-message" data-p2p-message></div>
+        <button class="primary-button form-state-button invalid" type="submit" data-p2p-submit>Run Single Switch Test</button>
+      </form>
+    </div>
+    <div class="progress-overlay" data-p2p-progress hidden>
+      <div class="progress-card">
+        <h3>P2P Testing Running</h3>
+        <div class="progress-track"><span data-p2p-progress-bar></span></div>
+        <ol class="progress-steps">
+          <li data-p2p-progress-step>Validating input and reserved VLAN rules</li>
+          <li data-p2p-progress-step>Opening Telnet session to switch device(s)</li>
+          <li data-p2p-progress-step>Checking VLAN availability on device(s)</li>
+          <li data-p2p-progress-step>Configuring temporary SVI interfaces</li>
+          <li data-p2p-progress-step>Running connectivity tests and drop analysis</li>
+          <li data-p2p-progress-step>Cleaning up SVI if selected</li>
+          <li data-p2p-progress-step>Building final P2P result</li>
+        </ol>
+      </div>
+    </div>
+  {% elif active_tool == "cisco-ios-uploader" %}
+    <form class="panel-form narrow" method="post" data-ios-form>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="ios_phase1">
+      <h3>Phase 1 - Device Audit</h3>
+      <label>Username <input name="username" value="{{ defaults.username }}" required></label>
+      <label>Password <input name="password" type="password" required></label>
+      <label>Device IP <input name="device_ip" value="{{ defaults.device_ip }}" required></label>
+      <div class="field-message" data-ios-message></div>
+      <button class="primary-button form-state-button invalid" type="submit" data-ios-submit>Run Phase 1 Audit</button>
+    </form>
+  {% elif active_tool == "onu-configuration" %}
+    <form class="panel-form narrow" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="onu_fetch">
+      <h3>Find ONU</h3>
+      <label>OLT IP <input name="olt_ip" value="{{ defaults.olt_ip }}" required></label>
+      <label>Username <input name="username" value="{{ defaults.username|default:'vsolnoc' }}" required></label>
+      <label>Password <input name="password" type="password" required></label>
+      <label>ONU Serial/MAC <input name="serial" value="{{ defaults.serial }}" required></label>
+      <button class="primary-button" type="submit">Fetch ONU Info</button>
+    </form>
+  {% elif active_tool == "olt-vlan-creator" %}
+    <form class="panel-form narrow" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="olt_create_vlan">
+      <h3>Create OLT VLAN</h3>
+      <label>OLT IP <input name="olt_ip" value="{{ defaults.olt_ip|default:'10.101.95.160' }}" required></label>
+      <label>Username <input name="username" value="{{ defaults.username|default:'admin' }}" required></label>
+      <label>Password <input name="password" type="password" required></label>
+      <label>VLAN ID <input name="vlan_id" value="{{ defaults.vlan_id|default:'200' }}" required></label>
+      <button class="primary-button" type="submit">Create VLAN</button>
+    </form>
+  {% endif %}
+
+  {% if result %}
+    <section class="result-panel {{ result.kind }}" {% if not result.ios_report and not result.ios_upload %}data-auto-overview-url="{% url 'dashboard:home' %}"{% endif %}>
+      <h3>Result</h3>
+      <p>{{ result.message }}</p>
+      {% if not result.ios_report and not result.ios_upload %}
+        <div class="redirect-countdown" data-redirect-countdown>Overview will open in 60 seconds.</div>
+      {% endif %}
+      {% if result.p2p %}
+        <div class="p2p-result">
+          <h3>Test Summary</h3>
+          <div class="p2p-summary">
+            {% for row in result.p2p.summary %}
+              <span>{{ row.0 }}</span><strong>{{ row.1 }}</strong>
+            {% endfor %}
+          </div>
+          <div class="p2p-stage">
+            <strong>{{ result.p2p.stage }}</strong>
+            <div class="progress-track"><span style="width: {{ result.p2p.progress }}%"></span></div>
+          </div>
+          <div class="p2p-checks">
+            {% for check in result.p2p.checks %}
+              <div class="p2p-check ok">{{ check }}</div>
+            {% endfor %}
+          </div>
+          <label class="p2p-output-label">{{ result.p2p.ping_title }}</label>
+          <pre class="p2p-ping-output">{{ result.p2p.ping_output }}</pre>
+          <div class="p2p-verdict {{ result.p2p.verdict.kind }}">{{ result.p2p.verdict.text }}</div>
+          <div class="p2p-cleanup">{{ result.p2p.cleanup }}</div>
+        </div>
+      {% elif result.ios_report %}
+        <div class="ios-report">
+          <h3>Phase 1 Report</h3>
+          <div class="ios-report-grid">
+            <div><span>Device IP</span><strong>{{ result.ios_report.device_ip }}</strong></div>
+            <div><span>Switch Model</span><strong>{{ result.ios_report.model }}</strong></div>
+            <div><span>Current IOS</span><strong>{{ result.ios_report.ios_image }}</strong></div>
+            <div><span>Flash Space</span><strong>{{ result.ios_report.total_space }}</strong></div>
+          </div>
+          <div class="switch-ios-box">
+            <h3>IOS Files on Switch</h3>
+            {% if result.ios_report.switch_ios_files %}
+              <div class="switch-ios-list">
+                {% for ios_file in result.ios_report.switch_ios_files %}
+                  <div class="switch-ios-item {{ ios_file.kind }}">
+                    <span class="ios-state">{% if ios_file.is_running %}Running IOS{% else %}Uploaded IOS{% endif %}</span>
+                    <strong>{{ ios_file.filename }}</strong>
+                    <small>{{ ios_file.size }}</small>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-state">No IOS .bin files found in dir output.</div>
+            {% endif %}
+          </div>
+          <div class="ios-phase2">
+            <h3>Phase 2 - IOS Selection</h3>
+            <p>{{ result.ios_report.phase2.message }}</p>
+            <label>Select IOS
+              <select data-ios-select {% if not result.ios_report.phase2.options %}disabled{% endif %}>
+                {% for ios in result.ios_report.phase2.options %}
+                  <option
+                    value="{{ ios.filename }}"
+                    data-size="{{ ios.size }}"
+                    data-size-bytes="{{ ios.size_bytes }}"
+                    data-status="{{ ios.status }}"
+                    data-kind="{{ ios.kind }}"
+                    data-current="{{ ios.already_current|yesno:'yes,no' }}"
+                    data-space="{{ ios.has_space|yesno:'yes,no' }}"
+                    data-uploaded="{{ ios.uploaded_on_switch|yesno:'yes,no' }}"
+                  >
+                    {{ ios.filename }} - {{ ios.size }}
+                  </option>
+                {% empty %}
+                  <option>No related IOS found on TFTP server</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="ios-decision" data-ios-decision>
+              <span>Selected IOS status will appear here.</span>
+            </div>
+            <form method="post" action="{% url 'dashboard:ios_upload_start' %}" class="ios-upload-form" data-ios-upload-form data-ios-progress-form data-ios-start-url="{% url 'dashboard:ios_upload_start' %}" data-ios-status-url-template="{% url 'dashboard:ios_upload_status' 'JOB_ID' %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="ios_upload">
+              <input type="hidden" name="username" value="{{ defaults.username }}">
+              <input type="hidden" name="password" value="{{ defaults.password }}">
+              <input type="hidden" name="device_ip" value="{{ result.ios_report.device_ip }}">
+              <input type="hidden" name="model" value="{{ result.ios_report.model }}">
+              <input type="hidden" name="family" value="{{ result.ios_report.phase2.family }}">
+              <input type="hidden" name="free_bytes" value="{{ result.ios_report.free_bytes }}">
+              <input type="hidden" name="ios_file" data-ios-upload-file>
+              <input type="hidden" name="ios_size_bytes" data-ios-upload-size>
+              <button class="primary-button" type="submit" data-ios-upload-button>IOS Upload</button>
+            </form>
+            <div class="ios-source">Source: {{ result.ios_report.phase2.tftp_url }}{% if result.ios_report.phase2.family %} | Family: {{ result.ios_report.phase2.family }}{% endif %}</div>
+          </div>
+        </div>
+      {% elif result.ios_upload %}
+        <div class="ios-report">
+          <h3>IOS Upload Result</h3>
+          <div class="ios-report-grid">
+            <div><span>Device IP</span><strong>{{ result.ios_upload.device_ip }}</strong></div>
+            <div><span>Switch Model</span><strong>{{ result.ios_upload.model }}</strong></div>
+            <div><span>Selected IOS</span><strong>{{ result.ios_upload.ios_file }}</strong></div>
+            <div><span>Destination</span><strong>{{ result.ios_upload.destination }}</strong></div>
+          </div>
+          {% if result.raw %}
+            <pre>{{ result.raw }}</pre>
+          {% endif %}
+        </div>
+      {% else %}
+      {% if result.details %}
+        <ul class="result-list">
+          {% for line in result.details %}
+            <li class="{% if line|slice:':5' == 'ERROR' %}result-error{% elif line|slice:':2' == 'OK' %}result-success{% else %}result-neutral{% endif %}">
+              <span class="result-badge">{% if line|slice:':5' == 'ERROR' %}FAIL{% elif line|slice:':2' == 'OK' %}OK{% else %}INFO{% endif %}</span>
+              <span>{{ line }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if result.raw %}
+        <pre>{{ result.raw }}</pre>
+      {% endif %}
+      {% endif %}
+    </section>
+  {% endif %}
+  <div class="progress-overlay" data-progress-overlay hidden>
+    <div class="progress-card">
+      <h3>VLAN Configuration Running</h3>
+      <div class="progress-track"><span data-progress-bar></span></div>
+      <ol class="progress-steps live-hidden-steps" hidden>
+        <li data-progress-step>Validating form and selected regions</li>
+        <li data-progress-step>Preparing default excluded IP list</li>
+        <li data-progress-step>Scanning live devices in selected subnets</li>
+        <li data-progress-step>Connecting to switches by Telnet</li>
+        <li data-progress-step>Creating VLAN and saving configuration</li>
+        <li data-progress-step>Collecting final success/error details</li>
+      </ol>
+    </div>
+  </div>
+  <div class="progress-overlay" data-lastmile-progress hidden>
+    <div class="progress-card">
+      <h3>Last-Mile Configuration Running</h3>
+      <div class="progress-track"><span data-lastmile-progress-bar></span></div>
+      <ol class="progress-steps live-hidden-steps" hidden>
+        <li data-lastmile-progress-step>Validating selected port, VLAN and mode</li>
+        <li data-lastmile-progress-step>Opening Telnet session to last-mile switch</li>
+        <li data-lastmile-progress-step>Resetting selected interface</li>
+        <li data-lastmile-progress-step>Applying DATA/BW interface commands</li>
+        <li data-lastmile-progress-step>Saving configuration with copy running-config startup-config</li>
+        <li data-lastmile-progress-step>Sending Enter twice and waiting for prompt</li>
+        <li data-lastmile-progress-step>Fetching final running configuration</li>
+      </ol>
+    </div>
+  </div>
+  <div class="progress-overlay" data-ios-progress hidden>
+    <div class="progress-card">
+      <h3>Cisco IOS Phase 1 Running</h3>
+      <div class="progress-track"><span data-ios-progress-bar></span></div>
+      <ol class="progress-steps">
+        <li data-ios-progress-step>Validating credentials and device IP</li>
+        <li data-ios-progress-step>Opening Telnet session to Cisco switch</li>
+        <li data-ios-progress-step>Fetching current IOS with show version</li>
+        <li data-ios-progress-step>Fetching switch model with show inventory</li>
+        <li data-ios-progress-step>Checking flash space with dir</li>
+        <li data-ios-progress-step>Building Phase 1 report</li>
+      </ol>
+    </div>
+  </div>
+  <div class="progress-overlay" data-ios-upload-progress hidden>
+    <div class="progress-card wide-progress-card">
+      <h3>IOS Upload Running</h3>
+      <div class="progress-track"><span data-ios-upload-progress-bar></span></div>
+      <ol class="progress-steps">
+        <li data-ios-upload-progress-step>Validating selected IOS and flash space</li>
+        <li data-ios-upload-progress-step>Opening Telnet session in privilege mode</li>
+        <li data-ios-upload-progress-step>Starting copy from HTTP TFTP source</li>
+        <li data-ios-upload-progress-step>Confirming destination filename</li>
+        <li data-ios-upload-progress-step>Waiting for device upload output</li>
+        <li data-ios-upload-progress-step>Collecting final copy result</li>
+      </ol>
+      <div class="ios-upload-percent"><strong data-ios-upload-percent>0%</strong> completed</div>
+      <div class="ios-size-compare" data-ios-size-compare hidden></div>
+      <pre class="live-copy-preview" data-ios-live-output hidden></pre>
+      <div class="ios-upload-verification" data-ios-upload-verification hidden></div>
+      <div class="ios-guidelines" data-ios-guidelines hidden></div>
+      <a class="primary-button back-overview-button" href="{% url 'dashboard:home' %}" data-ios-back-overview hidden>Back to Overview</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

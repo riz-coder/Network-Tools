@@ -1,0 +1,70 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}NETWORK-TOOLS{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'dashboard/app.css' %}?v=66">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="{% url 'dashboard:home' %}">
+        <span class="brand-mark">N</span>
+        <span class="brand-copy"><strong>NETWORK</strong><small>TOOLS</small></span>
+      </a>
+      <div class="nav-label">Workspace</div>
+      <nav class="tool-nav">
+        <a class="nav-item {% if not active_tool %}active{% endif %}" href="{% url 'dashboard:home' %}">
+          <span class="nav-icon">OV</span><span>Overview</span>
+        </a>
+        {% for slug, item in visible_tools.items %}
+          <a class="nav-item {% if active_tool == slug %}active{% endif %}" href="{% url 'dashboard:tool' slug %}">
+            <span class="nav-icon">{{ item.icon }}</span><span>{{ item.short_name }}</span>
+          </a>
+        {% endfor %}
+      </nav>
+      {% if request.user.username == "rizwan" %}
+        <div class="sidebar-users">
+          <div class="nav-label">Users</div>
+          <a class="nav-item {% if request.resolver_match.url_name == 'users' %}active{% endif %}" href="{% url 'dashboard:users' %}">
+            <span class="nav-icon">US</span>
+            <span>Manage Users</span>
+          </a>
+        </div>
+      {% endif %}
+      <div class="sidebar-footer">
+        <button class="theme-toggle" type="button" data-theme-toggle>
+          <span data-theme-toggle-icon>☀</span>
+          <span data-theme-toggle-text>Light Theme</span>
+        </button>
+        <div class="service-status"><span class="status-dot"></span> Single Django service</div>
+      </div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar">
+        <button class="menu-button" id="menuButton" aria-label="Toggle navigation">Menu</button>
+        <div>
+          <div class="eyebrow">Operations Console</div>
+          <h1>{% block heading %}Network Tools{% endblock %}</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="topbar-user">{{ request.user.username }}</span>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="logout-button" type="submit">Logout</button>
+          </form>
+          <div class="topbar-status"><span class="status-dot"></span> 127.0.0.1:8501</div>
+        </div>
+      </header>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script src="{% static 'dashboard/app.js' %}?v=66"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
