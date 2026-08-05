@@ -48,16 +48,18 @@
       </div>
       <strong>{{ activity.user_count }}</strong>
     </div>
-    <div class="operator-list">
+    <div class="operator-bar-chart">
       {% if activity.pie_segments %}
         {% for item in activity.pie_segments %}
-          <div class="operator-row" style="--operator-color: {{ item.color }}">
-            <div>
+          <div class="operator-bar-row" style="--operator-color: {{ item.color }}">
+            <div class="operator-bar-meta">
               <strong>{{ item.user }}</strong>
-              <small>{{ item.count }} job{% if item.count != 1 %}s{% endif %} today</small>
+              <b>{{ item.count }}</b>
             </div>
-            <b>{{ item.count }}</b>
-            <span style="width: {{ item.percent }}%"></span>
+            <div class="operator-bar-track" title="{{ item.user }} - {{ item.count }} job{% if item.count != 1 %}s{% endif %} today">
+              <span style="width: {{ item.percent }}%"></span>
+            </div>
+            <small>{{ item.count }} job{% if item.count != 1 %}s{% endif %} today</small>
           </div>
         {% endfor %}
       {% else %}
