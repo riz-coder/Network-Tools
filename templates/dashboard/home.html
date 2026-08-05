@@ -6,6 +6,7 @@
     <div class="connect-wordmark">CONNECT NOC</div>
   </div>
 
+  <div class="overview-widgets">
   <section class="mac-dashboard mac-dashboard-single" data-mac-dashboard data-mac-update-all-url="{% url 'dashboard:mac_update_all' %}">
       <div class="mac-pie-panel">
         <div class="panel-title">
@@ -39,5 +40,31 @@
         <div class="mac-update-status" data-mac-update-status></div>
       </div>
   </section>
+  <section class="overview-panel active-operators-panel">
+    <div class="panel-title">
+      <div>
+        <span class="eyebrow">Today</span>
+        <h3>Active operators</h3>
+      </div>
+      <strong>{{ activity.user_count }}</strong>
+    </div>
+    <div class="operator-list">
+      {% if activity.pie_segments %}
+        {% for item in activity.pie_segments %}
+          <div class="operator-row" style="--operator-color: {{ item.color }}">
+            <div>
+              <strong>{{ item.user }}</strong>
+              <small>{{ item.count }} job{% if item.count != 1 %}s{% endif %} today</small>
+            </div>
+            <b>{{ item.count }}</b>
+            <span style="width: {{ item.percent }}%"></span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">No operator activity yet today.</div>
+      {% endif %}
+    </div>
+  </section>
+  </div>
 </section>
 {% endblock %}

@@ -1593,6 +1593,7 @@ pre {
   .activity-row { grid-template-columns: 1fr; }
   .activity-message { white-space: normal; }
   .region-grid, .selected-port-info, .pie-wrap, .ios-report-grid { grid-template-columns: 1fr; }
+  .overview-widgets { grid-template-columns: 1fr; }
 }
 
 /* Cool orange flat theme */
@@ -1769,6 +1770,75 @@ html, body {
 }
 .mac-dashboard-single .mac-update-all-form {
   grid-template-columns: 1fr;
+}
+.overview-widgets {
+  display: grid;
+  grid-template-columns: 420px minmax(280px, 420px);
+  gap: 16px;
+  align-items: start;
+}
+.active-operators-panel {
+  width: 100%;
+  padding: 14px;
+}
+.active-operators-panel .panel-title {
+  align-items: center;
+}
+.active-operators-panel .panel-title > strong {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 138, 31, .45);
+  border-radius: 50%;
+  color: var(--accent);
+  background: rgba(255, 138, 31, .1);
+  font-size: 18px;
+}
+.operator-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.operator-row {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--operator-color) 46%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--operator-color) 10%, var(--panel));
+}
+.operator-row div,
+.operator-row b {
+  position: relative;
+  z-index: 1;
+}
+.operator-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+}
+.operator-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.operator-row b {
+  color: var(--operator-color);
+  font-size: 22px;
+}
+.operator-row span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  min-width: 4px;
+  background: var(--operator-color);
 }
 
 /* Light theme */
@@ -2014,4 +2084,14 @@ body.light-theme .ios-decision.error {
   background: rgba(199, 55, 55, .08);
   border-color: rgba(199, 55, 55, .55);
   color: #9d2222;
+}
+body.light-theme .operator-row {
+  background: color-mix(in srgb, var(--operator-color) 9%, #fffdf8);
+  border-color: color-mix(in srgb, var(--operator-color) 42%, #e2bd8b);
+}
+body.light-theme .operator-row strong {
+  color: #20150d;
+}
+body.light-theme .operator-row small {
+  color: #705f50;
 }
