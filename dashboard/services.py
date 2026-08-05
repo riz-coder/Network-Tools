@@ -1604,6 +1604,64 @@ def check_vlan_exists(tn, vlan):
     return True, f"VLAN {vlan} exists on device"
 
 
+def _read_ping_until_done(tn, max_wait=15):
+    output = ""
+    start_time = time.time()
+    while True:
+        time.sleep(0.5)
+        if tn.sock_avail():
+            chunk = tn.read_very_eager().decode(errors="ignore")
+            output += chunk
+            if re.search(r"(Success rate is|packets transmitted|packet loss)", output, re.I):
+                break
+        if time.time() - start_time > max_wait:
+            break
+    return output
+
+
+def _ping_failed(output):
+    text = output or ""
+    return bool(
+        re.search(r"Success\s+rate\s+is\s+0\s+percent\s*\(0/\d+\)", text, re.I)
+        or re.search(r"0\s+percent\s*\(0/5\)", text, re.I)
+        or re.search(r"\d+\s+packets\s+transmitted,\s*0\s+(?:packets\s+)?received,\s*100(?:\.0+)?%\s+packet\s+loss", text, re.I)
+        or re.search(r"100(?:\.0+)?%\s+packet\s+loss", text, re.I)
+    )
+
+
+def run_smart_ping(tn, target_ip):
+    tn.write(f"ping {target_ip}\n".encode())
+    simple_ping_output = _read_ping_until_done(tn, max_wait=15)
+    if _ping_failed(simple_ping_output):
+        return simple_ping_output, False
+
+    repeat_output = ""
+    repeat_done = False
+    for command in [
+        f"ping {target_ip} repeat 1000 size 1500",
+        f"ping {target_ip} count 1000",
+        f"ping {target_ip} -n 1000",
+    ]:
+        tn.write(f"{command}\n".encode())
+        current_output = _read_ping_until_done(tn, max_wait=20)
+        repeat_output = current_output
+        if not re.search(r"(Invalid input|Unknown command|Incomplete command|Ambiguous command|Error)", current_output, re.I):
+            repeat_done = bool(re.search(r"(Success rate|packets transmitted|packet loss)", current_output, re.I))
+            if repeat_done:
+                break
+
+    combined = (
+        simple_ping_output
+        + "\n"
+        + "=" * 50
+        + "\nExtended Ping Result (1000 packets):\n"
+        + "=" * 50
+        + "\n"
+        + repeat_output
+    )
+    return combined, repeat_done
+
+
 def run_p2p_test(post):
     username = post.get("username", "").strip()
     password = post.get("password", "")
@@ -1635,7 +1693,7 @@ def run_p2p_test(post):
     sw2_addr, sw2_mask = cidr_to_ip_mask(sw2_interface_ip)
     out1 = run_command(tn1, f"conf t\ninterface vlan {vlan}\nip address {sw1_addr} {sw1_mask}\nno shut\nend", 5)
     out2 = run_command(tn2, f"conf t\ninterface vlan {vlan}\nip address {sw2_addr} {sw2_mask}\nno shut\nend", 5)
-    ping = run_command(tn1, f"ping {sw2_addr}", 12)
+    ping, repeat_done = run_smart_ping(tn1, sw2_addr)
     cleanup_output = "Cleanup skipped. SVI remains bound."
     if cleanup:
         cleanup1 = run_command(tn1, f"conf t\nno interface vlan {vlan}\nend", 3)
@@ -1662,7 +1720,7 @@ def run_p2p_test(post):
             "progress": 100,
             "stage": "Test Completed Successfully",
             "checks": [f"SW1: {vlan_msg1}", f"SW2: {vlan_msg2}"],
-            "ping_title": "Ping Output (SW1->SW2)",
+            "ping_title": "Ping Output (SW1->SW2) - Basic + 1000 Pings" if repeat_done else "Ping Output (SW1->SW2) - Basic Ping Only",
             "ping_output": ping,
             "verdict": verdict,
             "cleanup": "Cleanup Completed" if cleanup else "Cleanup Skipped",
@@ -1693,7 +1751,7 @@ def run_single_switch_test(post):
     addr, mask = cidr_to_ip_mask(interface_ip)
     config = run_command(tn, f"conf t\ninterface vlan {vlan}\nip address {addr} {mask}\nno shut\nend", 5)
     arp = run_command(tn, f"show ip arp vlan {vlan}", 2)
-    gw_to_client_ping = run_command(tn, f"ping {target_ip}", 12)
+    gw_to_client_ping, gw_repeat_done = run_smart_ping(tn, target_ip)
     client_to_gw_ok = ping_host(addr)
     client_to_gw_ping = f"App server/client-side ping to gateway {addr}: {'OK - reachable' if client_to_gw_ok else 'ERROR - not reachable'}"
     cleanup_output = "Cleanup skipped. SVI remains bound."
@@ -1724,7 +1782,7 @@ def run_single_switch_test(post):
             "progress": 100,
             "stage": "Test Completed Successfully",
             "checks": [f"Switch: {vlan_msg}", "GW -> Client test completed", client_to_gw_ping],
-            "ping_title": "Bidirectional Ping Output",
+            "ping_title": "Bidirectional Ping Output - Basic + 1000 Pings" if gw_repeat_done else "Bidirectional Ping Output - Basic Ping Only",
             "ping_output": f"GW -> Client\n{'=' * 60}\n{gw_to_client_ping}\n\nClient -> GW\n{'=' * 60}\n{client_to_gw_ping}",
             "verdict": verdict,
             "cleanup": "Cleanup Completed" if cleanup else "Cleanup Skipped",
@@ -1733,19 +1791,45 @@ def run_single_switch_test(post):
 
 
 def analyze_ping_output(output):
-    if re.search(r"Success\s+rate\s+is\s+0\s+percent", output or "", re.I) or re.search(r"100(?:\.0+)?%\s+packet\s+loss", output or "", re.I):
+    text = output or ""
+    if re.search(r"Success\s+rate\s+is\s+0\s+percent", text, re.I) or re.search(r"100(?:\.0+)?%\s+packet\s+loss", text, re.I):
         return {"kind": "error", "text": "Ping Failed - No Connectivity (0%)"}
-    matches = re.findall(r"Success\s+rate\s+is\s+(\d+)\s+percent", output or "", re.I)
-    success = int(matches[-1]) if matches else None
+
+    success = None
+    loss = None
+    cisco_matches = re.findall(r"Success\s+rate\s+is\s+(\d+)\s*percent.*?\((\d+)/(\d+)\)", text, re.I)
+    linux_matches = re.findall(
+        r"(\d+)\s+packets\s+transmitted.*?(\d+)\s+(?:packets\s+)?received.*?([\d.]+)%\s*packet\s*loss",
+        text,
+        re.S | re.I,
+    )
+    if cisco_matches:
+        success_text, received_text, transmitted_text = cisco_matches[-1]
+        success = int(success_text)
+        received = int(received_text)
+        transmitted = int(transmitted_text) or 1
+        loss = round(((transmitted - received) / transmitted) * 100, 2)
+    elif linux_matches:
+        transmitted_text, received_text, loss_text = linux_matches[-1]
+        transmitted = int(transmitted_text) or 1
+        received = int(received_text)
+        loss = float(loss_text)
+        success = round((received / transmitted) * 100, 2)
+    else:
+        matches = re.findall(r"Success\s+rate\s+is\s+(\d+)\s+percent", text, re.I)
+        success = int(matches[-1]) if matches else None
+        loss = 100 - success if success is not None else None
+
     if success is None:
         return {"kind": "warning", "text": "Ping Output Format Unexpected"}
-    loss = 100 - success
     if success == 100:
         return {"kind": "success", "text": f"Perfect Connectivity - {success}% (~0.00% loss)"}
     if success >= 98:
         return {"kind": "success", "text": f"Results fine - {success}% (~{loss:.2f}% loss)"}
     if success >= 80:
-        return {"kind": "warning", "text": f"Drops Observed - {success}% (~{loss:.1f}% loss)"}
+        if loss >= 5:
+            return {"kind": "error", "text": f"Severe Drops observed - {success}% (~{loss:.1f}% loss)"}
+        return {"kind": "warning", "text": f"Minor Drops Observed - {success}% (~{loss:.1f}% loss)"}
     return {"kind": "error", "text": f"Severe Drops Detected - {success}% (~{loss:.1f}% loss)"}
 
 
