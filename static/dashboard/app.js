@@ -58,8 +58,8 @@
       backButton = document.createElement("a");
       backButton.className = "primary-button back-overview-button";
       backButton.setAttribute("data-live-back-button", "");
-      backButton.href = "/tools/corporate-deployment/";
-      backButton.textContent = "Back to Deployment";
+      backButton.href = "#";
+      backButton.textContent = "Back to Tool";
       backButton.hidden = true;
       card.appendChild(backButton);
     }
@@ -114,6 +114,12 @@
                 bar.style.width = "100%";
                 var action = (qs(form, 'input[name="action"]') || {}).value || "";
                 if (backButton && (action === "span_vlan" || action === "apply_lastmile")) {
+                  backButton.href = "/tools/corporate-deployment/";
+                  backButton.textContent = "Back to Deployment";
+                  backButton.hidden = false;
+                } else if (backButton && (action === "p2p_test" || action === "single_switch_test")) {
+                  backButton.href = "/tools/p2p-testing/";
+                  backButton.textContent = "Back to P2P Tool";
                   backButton.hidden = false;
                 }
                 return;
