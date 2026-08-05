@@ -15,7 +15,7 @@ First time:
 
 ```bash
 cd /opt
-sudo git clone <YOUR_REPO_URL> network-dashboard
+sudo git clone https://github.com/riz-coder/Network-Tools network-dashboard
 sudo chown -R $USER:$USER /opt/network-dashboard
 cd /opt/network-dashboard
 ```
@@ -46,6 +46,22 @@ Create/update the root operator user:
 
 ```bash
 python manage.py shell -c "from django.contrib.auth.models import User; u, _ = User.objects.get_or_create(username='rizwan'); u.set_password('RIzwan23#$%'); u.is_staff=True; u.is_superuser=True; u.save(); User.objects.exclude(username='rizwan').update(is_staff=False, is_superuser=False)"
+```
+
+Fix SQLite and local runtime file permissions for the service user:
+
+```bash
+sudo chown -R $USER:$USER /opt/network-dashboard
+chmod 664 /opt/network-dashboard/db.sqlite3
+chmod 775 /opt/network-dashboard
+touch activity_log.json mac_cache.json
+chmod 664 activity_log.json mac_cache.json
+```
+
+If you run the systemd service with another user, replace `$USER` with that service user and run:
+
+```bash
+sudo chown -R YOUR_LINUX_USER:YOUR_LINUX_USER /opt/network-dashboard
 ```
 
 ## 5. Run the app
