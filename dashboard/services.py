@@ -25,6 +25,13 @@ TFTP_IOS_URL = "http://10.101.11.48/TFTP/"
 IOS_UPLOAD_JOBS = {}
 LIVE_TOOL_JOBS = {}
 SUPPORTED_IOS_MODEL_MESSAGE = "Only Catalyst 3560, 3750, and 4948 are supported currently."
+LIVE_ACTION_ACTIVITY = {
+    "span_vlan": ("corporate-deployment", "Corporate Deployment", "VLAN Span"),
+    "apply_lastmile": ("corporate-deployment", "Corporate Deployment", "Last-Mile Port"),
+    "p2p_test": ("p2p-testing", "P2P Testing", "P2P Switch Test"),
+    "single_switch_test": ("p2p-testing", "P2P Testing", "Single Switch Test"),
+    "ios_phase1": ("cisco-ios-uploader", "Cisco IOS Uploader", "Cisco IOS Phase 1"),
+}
 
 ROOT_SWITCHES = [
     {"name": "Korangi", "ip": "10.101.88.56"},
@@ -199,6 +206,10 @@ def _run_live_tool_job(job_id, action, post):
         "result": result,
         "done": True,
     })
+    activity_info = LIVE_ACTION_ACTIVITY.get(action)
+    if activity_info:
+        tool_slug, tool_name, activity_action = activity_info
+        log_activity(post.get("username", "").strip(), tool_slug, tool_name, activity_action, result)
 
 
 def _read_activity():
