@@ -1775,7 +1775,7 @@ html, body {
 /* Compact top-left MAC widget */
 .minimal-overview {
   align-content: start;
-  justify-items: start;
+  justify-items: stretch !important;
   gap: 14px;
 }
 .connect-noc-center {
@@ -1814,18 +1814,25 @@ html, body {
   grid-template-columns: minmax(720px, 1fr) minmax(280px, 420px);
   gap: 16px;
   align-items: start;
-  width: 100%;
-  justify-self: stretch;
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch !important;
 }
 .minimal-overview .overview-widgets {
-  justify-self: stretch;
+  justify-self: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
 }
-.mac-dashboard-combined {
-  width: 100%;
-  max-width: none;
-  justify-self: stretch;
+.mac-dashboard.mac-dashboard-combined {
+  display: block !important;
+  grid-template-columns: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch !important;
 }
 .combined-mac-panel {
+  width: 100% !important;
+  max-width: none !important;
   min-height: 0 !important;
   padding: 12px;
 }
