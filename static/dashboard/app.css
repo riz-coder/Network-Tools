@@ -1835,12 +1835,17 @@ html, body {
   min-height: 190px !important;
   gap: 10px;
 }
-.mac-graph-block .pie-chart.mac-pie-chart {
+.combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart {
   width: 190px !important;
   height: 190px !important;
+  max-width: 190px !important;
+  justify-self: center;
 }
-.mac-graph-block .pie-chart.mac-pie-chart span {
+.combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart span {
   font-size: 20px !important;
+}
+.combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart::after {
+  inset: 24% !important;
 }
 .mac-graph-block .pie-legend {
   max-height: 120px;
@@ -1868,6 +1873,7 @@ html, body {
 .dc-oc-dashboard .pie-chart.mac-pie-chart {
   width: 190px !important;
   height: 190px !important;
+  max-width: 190px !important;
 }
 .dc-oc-dashboard .pie-chart.mac-pie-chart span {
   font-size: 20px !important;
