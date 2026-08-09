@@ -26,11 +26,11 @@ IOS_UPLOAD_JOBS = {}
 LIVE_TOOL_JOBS = {}
 SUPPORTED_IOS_MODEL_MESSAGE = "Only Catalyst 3560, 3750, and 4948 are supported currently."
 MAC_MODEL_CAPACITY = {
-    "N9K-C9372": 98300,
-    "N6K-C6001": 128000,
-    "N3K-C3064": 128000,
+    "9372": 98300,
+    "6001": 128000,
+    "3064": 128000,
     "93180": 90000,
-    "N3K-C3232C": 40000,
+    "3232C": 40000,
 }
 LIVE_ACTION_ACTIVITY = {
     "span_vlan": ("corporate-deployment", "Corporate Deployment", "VLAN Span"),
