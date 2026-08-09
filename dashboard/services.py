@@ -1714,6 +1714,72 @@ def check_vlan_exists(tn, vlan):
     return True, f"VLAN {vlan} exists on device"
 
 
+def _entered_config_mode(output):
+    return bool(re.search(r"\(config[^\)]*\)#", output or "", re.I))
+
+
+def configure_svi_interface(tn, vlan, ip, mask, label, replace_existing=False):
+    """Configure SVI while preserving Cisco/Nexus and MTLink CLI handling."""
+    output_parts = []
+    config_output = run_command(tn, "conf t", wait_time=2)
+    output_parts.append(config_output)
+    mtlink_mode = not _entered_config_mode(config_output)
+
+    if mtlink_mode:
+        output_parts.append(run_command(tn, "conf", wait_time=1))
+        if replace_existing:
+            output_parts.append(run_command(tn, f"no interface vlan {vlan}", wait_time=1))
+        output_parts.append(run_command(tn, f"interface vlan {vlan}", wait_time=1))
+        ip_output = run_command(tn, f"ip address {ip} {mask}", wait_time=2)
+        output_parts.append(ip_output)
+        if re.search(r"(overlaps|Duplicate|already configured)", ip_output, re.I):
+            output_parts.append(run_command(tn, f"no interface vlan {vlan}", wait_time=1))
+            output_parts.append(run_command(tn, "exit", wait_time=1))
+            output_parts.append(run_command(tn, "exit", wait_time=1))
+            return False, f"Duplicate/Overlap on {label}", "\n".join(output_parts), "MTLink"
+        output_parts.append(run_command(tn, "no shut", wait_time=1))
+        output_parts.append(run_command(tn, "exit", wait_time=1))
+        output_parts.append(run_command(tn, "exit", wait_time=1))
+    else:
+        if replace_existing:
+            output_parts.append(run_command(tn, f"no interface vlan {vlan}", wait_time=1))
+        output_parts.append(run_command(tn, f"interface vlan {vlan}", wait_time=1))
+        ip_output = run_command(tn, f"ip address {ip} {mask}", wait_time=2)
+        output_parts.append(ip_output)
+        if re.search(r"(overlaps|Duplicate|already configured)", ip_output, re.I):
+            output_parts.append(run_command(tn, f"no interface vlan {vlan}", wait_time=1))
+            output_parts.append(run_command(tn, "end", wait_time=1))
+            return False, f"Duplicate/Overlap on {label}", "\n".join(output_parts), "Cisco/Nexus"
+        output_parts.append(run_command(tn, "no shut", wait_time=1))
+        output_parts.append(run_command(tn, "end", wait_time=1))
+
+    time.sleep(3)
+    return True, f"{label} SVI configured", "\n".join(output_parts), "MTLink" if mtlink_mode else "Cisco/Nexus"
+
+
+def cleanup_svi_interface(tn, vlan):
+    output_parts = []
+    config_output = run_command(tn, "conf t", wait_time=2)
+    output_parts.append(config_output)
+    if not _entered_config_mode(config_output):
+        output_parts.append(run_command(tn, "conf", wait_time=1))
+        output_parts.append(run_command(tn, f"no interface vlan {vlan}", wait_time=1))
+        output_parts.append(run_command(tn, "exit", wait_time=1))
+    else:
+        output_parts.append(run_command(tn, f"no interface vlan {vlan}", wait_time=1))
+        output_parts.append(run_command(tn, "end", wait_time=1))
+    return "\n".join(output_parts)
+
+
+def get_p2p_arp_table(tn, vlan=None, target_ip=None):
+    output = run_command(tn, f"show ip arp vlan {vlan}" if vlan else "show ip arp", wait_time=2)
+    if target_ip and re.search(r"(Too many parameters|Invalid input|Unknown command|\^)", output, re.I):
+        output = run_command(tn, f"show arp | include {target_ip}", wait_time=2)
+        if re.search(r"(Invalid input|Unknown command|\^)", output, re.I):
+            output = run_command(tn, "show arp", wait_time=2)
+    return output
+
+
 def _read_ping_until_done(tn, max_wait=15):
     output = ""
     start_time = time.time()
@@ -1755,7 +1821,7 @@ def run_smart_ping(tn, target_ip):
         tn.write(f"{command}\n".encode())
         current_output = _read_ping_until_done(tn, max_wait=20)
         repeat_output = current_output
-        if not re.search(r"(Invalid input|Unknown command|Incomplete command|Ambiguous command|Error)", current_output, re.I):
+        if not re.search(r"(%\s*Invalid|Invalid input|Unknown command|Incomplete command|Ambiguous command|Too many parameters|\^|Error)", current_output, re.I):
             repeat_done = bool(re.search(r"(Success rate|packets transmitted|packet loss)", current_output, re.I))
             if repeat_done:
                 break
@@ -1801,13 +1867,22 @@ def run_p2p_test(post):
         return message("error", "VLAN check failed.", [vlan_msg1, vlan_msg2])
     sw1_addr, sw1_mask = cidr_to_ip_mask(sw1_interface_ip)
     sw2_addr, sw2_mask = cidr_to_ip_mask(sw2_interface_ip)
-    out1 = run_command(tn1, f"conf t\ninterface vlan {vlan}\nip address {sw1_addr} {sw1_mask}\nno shut\nend", 5)
-    out2 = run_command(tn2, f"conf t\ninterface vlan {vlan}\nip address {sw2_addr} {sw2_mask}\nno shut\nend", 5)
+    ok_config1, config_msg1, out1, mode1 = configure_svi_interface(tn1, vlan, sw1_addr, sw1_mask, "SW1")
+    if not ok_config1:
+        tn1.close()
+        tn2.close()
+        return message("error", config_msg1, [out1])
+    ok_config2, config_msg2, out2, mode2 = configure_svi_interface(tn2, vlan, sw2_addr, sw2_mask, "SW2")
+    if not ok_config2:
+        cleanup1 = cleanup_svi_interface(tn1, vlan)
+        tn1.close()
+        tn2.close()
+        return message("error", config_msg2, [out2, "SW1 rollback:", cleanup1])
     ping, repeat_done = run_smart_ping(tn1, sw2_addr)
     cleanup_output = "Cleanup skipped. SVI remains bound."
     if cleanup:
-        cleanup1 = run_command(tn1, f"conf t\nno interface vlan {vlan}\nend", 3)
-        cleanup2 = run_command(tn2, f"conf t\nno interface vlan {vlan}\nend", 3)
+        cleanup1 = cleanup_svi_interface(tn1, vlan)
+        cleanup2 = cleanup_svi_interface(tn2, vlan)
         cleanup_output = f"SW1 cleanup:\n{cleanup1}\n\nSW2 cleanup:\n{cleanup2}"
     tn1.close()
     tn2.close()
@@ -1816,7 +1891,7 @@ def run_p2p_test(post):
         "kind": "success",
         "message": "P2P test completed.",
         "details": ["OK Input validation passed", f"OK SW1: {vlan_msg1}", f"OK SW2: {vlan_msg2}", "OK Ping test completed", "OK SVI cleanup completed" if cleanup else "OK SVI cleanup skipped"],
-        "raw": f"TEST SUMMARY\nVLAN: {vlan}\nSW1: {sw1_ip} -> {sw1_addr}/{sw1_mask}\nSW2: {sw2_ip} -> {sw2_addr}/{sw2_mask}\n\nPING OUTPUT\n{'=' * 60}\n{ping}\n\nSVI CLEANUP\n{'=' * 60}\n{cleanup_output}",
+        "raw": f"TEST SUMMARY\nVLAN: {vlan}\nSW1: {sw1_ip} -> {sw1_addr}/{sw1_mask} ({mode1})\nSW2: {sw2_ip} -> {sw2_addr}/{sw2_mask} ({mode2})\n\nCONFIG OUTPUT\n{'=' * 60}\nSW1:\n{out1}\n\nSW2:\n{out2}\n\nPING OUTPUT\n{'=' * 60}\n{ping}\n\nSVI CLEANUP\n{'=' * 60}\n{cleanup_output}",
         "p2p": {
             "type": "P2P Switch to Switch",
             "summary": [
@@ -1829,7 +1904,7 @@ def run_p2p_test(post):
             ],
             "progress": 100,
             "stage": "Test Completed Successfully",
-            "checks": [f"SW1: {vlan_msg1}", f"SW2: {vlan_msg2}"],
+            "checks": [f"SW1: {vlan_msg1}", f"SW2: {vlan_msg2}", f"SW1 CLI mode: {mode1}", f"SW2 CLI mode: {mode2}"],
             "ping_title": "Ping Output (SW1->SW2) - Basic + 1000 Pings" if repeat_done else "Ping Output (SW1->SW2) - Basic Ping Only",
             "ping_output": ping,
             "verdict": verdict,
@@ -1859,27 +1934,41 @@ def run_single_switch_test(post):
         tn.close()
         return message("error", vlan_msg)
     addr, mask = cidr_to_ip_mask(interface_ip)
-    config = run_command(tn, f"conf t\ninterface vlan {vlan}\nip address {addr} {mask}\nno shut\nend", 5)
-    arp = run_command(tn, f"show ip arp vlan {vlan}", 2)
+    config_ok1, config_msg1, config1, mode1 = configure_svi_interface(tn, vlan, addr, mask, "switch interface")
+    if not config_ok1:
+        tn.close()
+        return message("error", config_msg1, [config1])
     gw_to_client_ping, gw_repeat_done = run_smart_ping(tn, target_ip)
-    client_to_gw_ok = ping_host(addr)
-    client_to_gw_ping = f"App server/client-side ping to gateway {addr}: {'OK - reachable' if client_to_gw_ok else 'ERROR - not reachable'}"
+    arp1 = ""
+    if _ping_failed(gw_to_client_ping):
+        arp1 = get_p2p_arp_table(tn, vlan=vlan, target_ip=target_ip)
+
+    config_ok2, config_msg2, config2, mode2 = configure_svi_interface(tn, vlan, target_ip, mask, "client interface", replace_existing=True)
+    if not config_ok2:
+        cleanup_output = cleanup_svi_interface(tn, vlan)
+        tn.close()
+        return message("error", config_msg2, [config2, "Cleanup:", cleanup_output])
+    client_to_gw_ping, client_repeat_done = run_smart_ping(tn, addr)
+    arp2 = ""
+    if _ping_failed(client_to_gw_ping):
+        arp2 = get_p2p_arp_table(tn, vlan=vlan, target_ip=addr)
     cleanup_output = "Cleanup skipped. SVI remains bound."
     if cleanup:
-        cleanup_output = run_command(tn, f"conf t\nno interface vlan {vlan}\nend", 3)
+        cleanup_output = cleanup_svi_interface(tn, vlan)
     tn.close()
     gw_verdict = analyze_ping_output(gw_to_client_ping)
-    if gw_verdict["kind"] == "error" or not client_to_gw_ok:
+    client_verdict = analyze_ping_output(client_to_gw_ping)
+    if gw_verdict["kind"] == "error" or client_verdict["kind"] == "error":
         verdict = {"kind": "error", "text": "Connectivity failed in one or both directions"}
-    elif gw_verdict["kind"] == "warning":
+    elif gw_verdict["kind"] == "warning" or client_verdict["kind"] == "warning":
         verdict = gw_verdict
     else:
         verdict = {"kind": "success", "text": "Bidirectional connectivity verified"}
     return {
         "kind": "success",
         "message": "Single-switch test completed.",
-        "details": ["OK Input validation passed", f"OK {vlan_msg}", "OK GW to client test completed", "OK Client to GW test completed" if client_to_gw_ok else "ERROR Client to GW test failed", "OK SVI cleanup completed" if cleanup else "OK SVI cleanup skipped"],
-        "raw": f"TEST SUMMARY\nVLAN: {vlan}\nSwitch: {switch_ip}\nSwitch SVI: {addr}/{mask}\nClient IP: {target_ip}\n\nCONFIG OUTPUT\n{'=' * 60}\n{config}\n\nARP OUTPUT\n{'=' * 60}\n{arp}\n\nGW TO CLIENT PING OUTPUT\n{'=' * 60}\n{gw_to_client_ping}\n\nCLIENT TO GW PING OUTPUT\n{'=' * 60}\n{client_to_gw_ping}\n\nSVI CLEANUP\n{'=' * 60}\n{cleanup_output}",
+        "details": ["OK Input validation passed", f"OK {vlan_msg}", f"OK GW -> Client test completed ({mode1})", f"OK Client -> GW test completed ({mode2})", "OK SVI cleanup completed" if cleanup else "OK SVI cleanup skipped"],
+        "raw": f"TEST SUMMARY\nVLAN: {vlan}\nSwitch: {switch_ip}\nSwitch SVI: {addr}/{mask}\nClient IP: {target_ip}\n\nTEST 1 CONFIG OUTPUT\n{'=' * 60}\n{config1}\n\nGW TO CLIENT PING OUTPUT\n{'=' * 60}\n{gw_to_client_ping}\n\nARP OUTPUT - GW TO CLIENT\n{'=' * 60}\n{arp1 or 'ARP check skipped because ping did not fully fail.'}\n\nTEST 2 CONFIG OUTPUT\n{'=' * 60}\n{config2}\n\nCLIENT TO GW PING OUTPUT\n{'=' * 60}\n{client_to_gw_ping}\n\nARP OUTPUT - CLIENT TO GW\n{'=' * 60}\n{arp2 or 'ARP check skipped because ping did not fully fail.'}\n\nSVI CLEANUP\n{'=' * 60}\n{cleanup_output}",
         "p2p": {
             "type": "Single Switch to End User",
             "summary": [
@@ -1891,8 +1980,8 @@ def run_single_switch_test(post):
             ],
             "progress": 100,
             "stage": "Test Completed Successfully",
-            "checks": [f"Switch: {vlan_msg}", "GW -> Client test completed", client_to_gw_ping],
-            "ping_title": "Bidirectional Ping Output - Basic + 1000 Pings" if gw_repeat_done else "Bidirectional Ping Output - Basic Ping Only",
+            "checks": [f"Switch: {vlan_msg}", f"GW -> Client test completed ({mode1})", f"Client -> GW test completed ({mode2})"],
+            "ping_title": "Bidirectional Ping Output - Basic + 1000 Pings" if (gw_repeat_done or client_repeat_done) else "Bidirectional Ping Output - Basic Ping Only",
             "ping_output": f"GW -> Client\n{'=' * 60}\n{gw_to_client_ping}\n\nClient -> GW\n{'=' * 60}\n{client_to_gw_ping}",
             "verdict": verdict,
             "cleanup": "Cleanup Completed" if cleanup else "Cleanup Skipped",
