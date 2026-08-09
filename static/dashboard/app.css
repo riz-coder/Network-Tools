@@ -1815,10 +1815,15 @@ html, body {
   gap: 16px;
   align-items: start;
   width: 100%;
+  justify-self: stretch;
+}
+.minimal-overview .overview-widgets {
+  justify-self: stretch;
 }
 .mac-dashboard-combined {
   width: 100%;
   max-width: none;
+  justify-self: stretch;
 }
 .combined-mac-panel {
   min-height: 0 !important;
