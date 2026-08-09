@@ -802,6 +802,43 @@ html, body {
   border-radius: 3px;
   background: var(--line);
 }
+.pie-legend .mac-util-row {
+  display: grid;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 7px;
+}
+.mac-util-row em {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-style: normal;
+  font-weight: 900;
+}
+.mac-util-row small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+.mac-util-row b {
+  display: block;
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+}
+.mac-util-row b strong {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  max-width: 100%;
+  border-radius: inherit;
+  background: var(--good);
+}
+.mac-util-row.mac-util-warn b strong { background: var(--accent); }
+.mac-util-row.mac-util-bad b strong { background: var(--bad); }
+.mac-util-row.mac-util-unknown b strong { background: var(--muted); width: 0 !important; }
 .user-management {
   margin-top: 14px;
   padding-top: 14px;
@@ -2101,4 +2138,13 @@ body.light-theme .operator-bar-row small {
 body.light-theme .operator-bar-track {
   background: rgba(112, 95, 80, .12);
   border-color: rgba(112, 95, 80, .12);
+}
+body.light-theme .mac-util-row em {
+  color: #20150d;
+}
+body.light-theme .mac-util-row small {
+  color: #705f50;
+}
+body.light-theme .mac-util-row b {
+  background: rgba(112, 95, 80, .12);
 }

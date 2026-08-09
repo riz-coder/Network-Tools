@@ -692,7 +692,7 @@
           macTooltip.classList.remove("show");
           return;
         }
-        macTooltip.textContent = item.name + " - " + item.count;
+        macTooltip.textContent = item.name + " - " + item.count + " | " + (item.utilization || "N/A") + " utilized";
         macTooltip.style.left = (event.clientX + 12) + "px";
         macTooltip.style.top = (event.clientY + 12) + "px";
         macTooltip.classList.add("show");
@@ -700,6 +700,17 @@
       macPie.addEventListener("mouseleave", function () {
         macTooltip.classList.remove("show");
       });
+    }
+    function renderMacLegendItem(item) {
+      var level = item.utilization_level || "unknown";
+      var value = Number(item.utilization_value) || 0;
+      var title = item.name + " - " + item.count + " MACs | " + (item.model || "Not detected") + " | " + (item.utilization || "N/A") + " utilized";
+      return '<span class="mac-util-row mac-util-' + level + '" title="' + title + '">'
+        + '<em><i style="background: ' + item.color + '"></i>' + item.name + ' - ' + item.count + '</em>'
+        + '<small>' + (item.model || "Not detected") + ' / ' + (item.capacity || "Not mapped") + ' capacity</small>'
+        + '<b><strong style="width: ' + Math.min(100, value) + '%"></strong></b>'
+        + '<small>' + (item.utilization || "N/A") + ' utilized</small>'
+        + '</span>';
     }
     if (macUpdateAllForm) {
       macUpdateAllForm.addEventListener("submit", function (event) {
@@ -731,7 +742,7 @@
             }
             if (macLegend && data.pie_segments) {
               macLegend.innerHTML = data.pie_segments.length ? data.pie_segments.map(function (item) {
-                return '<span title="' + item.name + ' - ' + item.count + ' MACs"><i style="background: ' + item.color + '"></i>' + item.name + ' - ' + item.count + '</span>';
+                return renderMacLegendItem(item);
               }).join("") : "<span><i></i>No MAC data yet</span>";
             }
             if (data.pie_segments) setMacSegments(data.pie_segments);
@@ -786,7 +797,7 @@
             }
             if (macLegend && data.pie_segments) {
               macLegend.innerHTML = data.pie_segments.length ? data.pie_segments.map(function (item) {
-                return '<span title="' + item.name + ' - ' + item.count + ' MACs"><i style="background: ' + item.color + '"></i>' + item.name + ' - ' + item.count + '</span>';
+                return renderMacLegendItem(item);
               }).join("") : "<span><i></i>No MAC data yet</span>";
             }
             if (data.pie_segments) setMacSegments(data.pie_segments);

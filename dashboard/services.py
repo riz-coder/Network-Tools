@@ -25,6 +25,13 @@ TFTP_IOS_URL = "http://10.101.11.48/TFTP/"
 IOS_UPLOAD_JOBS = {}
 LIVE_TOOL_JOBS = {}
 SUPPORTED_IOS_MODEL_MESSAGE = "Only Catalyst 3560, 3750, and 4948 are supported currently."
+MAC_MODEL_CAPACITY = {
+    "N9K-C9372": 98300,
+    "N6K-C6001": 128000,
+    "N3K-C3064": 128000,
+    "93180": 90000,
+    "N3K-C3232C": 40000,
+}
 LIVE_ACTION_ACTIVITY = {
     "span_vlan": ("corporate-deployment", "Corporate Deployment", "VLAN Span"),
     "apply_lastmile": ("corporate-deployment", "Corporate Deployment", "Last-Mile Port"),
@@ -262,6 +269,56 @@ def parse_mac_count_output(output):
     return hostname, count
 
 
+def parse_inventory_model(output):
+    text = output or ""
+    pids = [match.group(1).strip() for match in re.finditer(r"PID:\s*([^,\s]+)", text, re.I) if match.group(1).strip()]
+    descriptions = [match.group(1).strip() for match in re.finditer(r'DESCR:\s*"([^"]+)"', text, re.I)]
+    candidates = pids + descriptions
+    for candidate in candidates:
+        upper = candidate.upper()
+        for key in MAC_MODEL_CAPACITY:
+            if key in upper:
+                return key
+        model_match = re.search(r"(N[369]K-C[0-9A-Z-]+|C[0-9]{4,}[0-9A-Z-]*)", upper)
+        if model_match:
+            return model_match.group(1)
+    return ""
+
+
+def mac_capacity_for_model(model):
+    upper = (model or "").upper()
+    for key, capacity in MAC_MODEL_CAPACITY.items():
+        if key in upper:
+            return capacity
+    return 0
+
+
+def mac_utilization(count, model):
+    capacity = mac_capacity_for_model(model)
+    if not capacity:
+        return {
+            "capacity": 0,
+            "capacity_display": "Not mapped",
+            "percent": None,
+            "percent_display": "N/A",
+            "level": "unknown",
+        }
+    percent = min(999, (int(count or 0) / capacity) * 100)
+    if percent < 50:
+        level = "good"
+    elif percent <= 80:
+        level = "warn"
+    else:
+        level = "bad"
+    return {
+        "capacity": capacity,
+        "capacity_display": format_mac_count(capacity),
+        "percent": round(percent, 2),
+        "percent_display": f"{percent:.1f}%",
+        "level": level,
+    }
+
+
 def fetch_root_switch_mac(ip, username, password):
     tn, login_msg = telnet_login(ip, username, password, timeout=10)
     if not tn:
@@ -270,8 +327,10 @@ def fetch_root_switch_mac(ip, username, password):
         tn.write(b"terminal length 0\r\n")
         time.sleep(0.4)
         tn.read_very_eager()
+        tn.write(b"show inventory\r\n")
+        inventory_raw = read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=20)
         tn.write(b"show mac address-table count\r\n")
-        raw = read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=25)
+        mac_raw = read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=25)
         tn.write(b"exit\r\n")
         tn.close()
     except Exception as exc:
@@ -280,10 +339,12 @@ def fetch_root_switch_mac(ip, username, password):
         except Exception:
             pass
         return {"ok": False, "message": f"Telnet command error: {exc}"}
-    hostname, count = parse_mac_count_output(raw)
+    raw = f"{inventory_raw}\n{mac_raw}"
+    hostname, count = parse_mac_count_output(mac_raw)
+    model = parse_inventory_model(inventory_raw)
     if count is None:
         return {"ok": False, "message": "Total MAC count was not found in switch output.", "raw": raw}
-    return {"ok": True, "hostname": hostname or ip, "count": count, "count_display": format_mac_count(count), "raw": raw}
+    return {"ok": True, "hostname": hostname or ip, "model": model, "count": count, "count_display": format_mac_count(count), "raw": raw}
 
 
 def mac_dashboard():
@@ -298,8 +359,10 @@ def mac_dashboard():
             "name": switch["name"],
             "ip": switch["ip"],
             "hostname": row.get("hostname", "Not updated"),
+            "model": row.get("model", "Not detected"),
             "count": count,
             "count_display": format_mac_count(count),
+            "utilization": mac_utilization(count, row.get("model", "")),
             "updated_at": row.get("updated_at", ""),
             "fresh": mac_cache_is_fresh(row) if row else False,
             "status": row.get("status", "not-updated"),
@@ -314,7 +377,18 @@ def mac_dashboard():
             continue
         pct = row["count"] / total * 100
         color = colors[index % len(colors)]
-        pie_segments.append({"name": row["name"], "count": row["count_display"], "percent": round(pct, 4), "color": color})
+        util = row.get("utilization", {})
+        pie_segments.append({
+            "name": row["name"],
+            "count": row["count_display"],
+            "percent": round(pct, 4),
+            "color": color,
+            "model": row.get("model", "Not detected"),
+            "capacity": util.get("capacity_display", "Not mapped"),
+            "utilization": util.get("percent_display", "N/A"),
+            "utilization_value": util.get("percent") or 0,
+            "utilization_level": util.get("level", "unknown"),
+        })
         gradient_parts.append(f"{color} {current:.2f}% {current + pct:.2f}%")
         current += pct
     return {
@@ -335,6 +409,7 @@ def update_mac_cache_for_switch(ip, username, password):
     if result.get("ok"):
         cache[ip] = {
             "hostname": result.get("hostname") or switch["name"],
+            "model": result.get("model") or "Not detected",
             "count": result.get("count", 0),
             "updated_at": datetime.now().isoformat(timespec="seconds"),
             "status": "success",

@@ -24,7 +24,12 @@
           <div class="pie-legend" data-mac-pie-legend>
             {% if mac_dashboard.pie_segments %}
               {% for item in mac_dashboard.pie_segments %}
-                <span title="{{ item.name }} - {{ item.count }} MACs"><i style="background: {{ item.color }}"></i>{{ item.name }} - {{ item.count }}</span>
+                <span class="mac-util-row mac-util-{{ item.utilization_level }}" title="{{ item.name }} - {{ item.count }} MACs | {{ item.model }} | {{ item.utilization }} utilized">
+                  <em><i style="background: {{ item.color }}"></i>{{ item.name }} - {{ item.count }}</em>
+                  <small>{{ item.model }} / {{ item.capacity }} capacity</small>
+                  <b><strong style="width: {{ item.utilization_value }}%"></strong></b>
+                  <small>{{ item.utilization }} utilized</small>
+                </span>
               {% endfor %}
             {% else %}
               <span><i></i>No MAC data yet</span>
