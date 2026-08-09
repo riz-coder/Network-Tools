@@ -32,8 +32,11 @@
   function parseLiveJson(response) {
     var contentType = response.headers.get("content-type") || "";
     if (contentType.indexOf("application/json") === -1) {
-      return response.text().then(function () {
-        throw new Error("Live API returned HTML instead of JSON. HTTP " + response.status + ".");
+      return response.text().then(function (text) {
+        var error = new Error("Live API returned HTML instead of JSON. HTTP " + response.status + ".");
+        error.transientHtml = response.status === 200 && /<!doctype html|<html|<body|<form/i.test(text || "");
+        error.status = response.status;
+        throw error;
       });
     }
     return response.json();
@@ -73,10 +76,12 @@
       .then(function (data) {
         if (!data.ok) throw new Error(data.message || "Live job could not start.");
         var statusUrl = form.dataset.liveStatusUrlTemplate.replace("JOB_ID", data.job_id);
+        var pollHtmlRetries = 0;
         var poll = function () {
           fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
             .then(parseLiveJson)
             .then(function (job) {
+              pollHtmlRetries = 0;
               bar.style.width = Math.max(2, Math.min(100, Number(job.percent) || 0)) + "%";
               if (steps.length) {
                 var activeIndex = Math.min(steps.length - 1, Math.floor(((Number(job.percent) || 0) / 100) * steps.length));
@@ -126,7 +131,22 @@
               }
               window.setTimeout(poll, 1000);
             })
-            .catch(function (error) { liveBox.innerHTML += '<div class="live-line error">Polling failed: ' + error.message + '</div>'; });
+            .catch(function (error) {
+              if (error.transientHtml && pollHtmlRetries < 12) {
+                pollHtmlRetries += 1;
+                var retryLine = qs(liveBox, "[data-poll-retry-line]");
+                if (!retryLine) {
+                  retryLine = document.createElement("div");
+                  retryLine.className = "live-line warn";
+                  retryLine.setAttribute("data-poll-retry-line", "");
+                  liveBox.appendChild(retryLine);
+                }
+                retryLine.textContent = "Display sync retry " + pollHtmlRetries + "/12. Backend job is still being checked...";
+                window.setTimeout(poll, 1500);
+                return;
+              }
+              liveBox.innerHTML += '<div class="live-line error">Polling failed: ' + error.message + '</div>';
+            });
         };
         poll();
       })
@@ -541,8 +561,11 @@
       function parseJsonResponse(response) {
         var contentType = response.headers.get("content-type") || "";
         if (contentType.indexOf("application/json") === -1) {
-          return response.text().then(function () {
-            throw new Error("Upload API returned HTML instead of JSON. HTTP " + response.status + ".");
+          return response.text().then(function (text) {
+            var error = new Error("Upload API returned HTML instead of JSON. HTTP " + response.status + ".");
+            error.transientHtml = response.status === 200 && /<!doctype html|<html|<body|<form/i.test(text || "");
+            error.status = response.status;
+            throw error;
           });
         }
         return response.json();
@@ -552,10 +575,12 @@
         .then(function (data) {
           if (!data.ok) throw new Error(data.message || "Upload job could not start.");
           var statusUrl = (form.dataset.iosStatusUrlTemplate || "").replace("JOB_ID", data.job_id);
+          var uploadPollHtmlRetries = 0;
           var poll = function () {
             fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
               .then(parseJsonResponse)
               .then(function (job) {
+                uploadPollHtmlRetries = 0;
                 if (liveOutput) {
                   liveOutput.textContent = job.output || job.message || "";
                   liveOutput.scrollTop = liveOutput.scrollHeight;
@@ -598,6 +623,12 @@
                 window.setTimeout(poll, 1000);
               })
               .catch(function (error) {
+                if (error.transientHtml && uploadPollHtmlRetries < 12) {
+                  uploadPollHtmlRetries += 1;
+                  if (liveOutput) liveOutput.textContent += "\nDisplay sync retry " + uploadPollHtmlRetries + "/12. Upload job is still being checked...";
+                  window.setTimeout(poll, 1500);
+                  return;
+                }
                 if (liveOutput) liveOutput.textContent += "\nStatus polling failed: " + error;
               });
           };
