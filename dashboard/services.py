@@ -379,7 +379,13 @@ def mac_dashboard_for(switches):
     pie_segments = []
     gradient_parts = []
     colors = USER_COLORS + ["#5dd9c1", "#ff6f91", "#a3e635", "#38bdf8"]
-    for index, row in enumerate(sorted(rows, key=lambda item: item["count"], reverse=True)):
+    def pie_sort_key(item):
+        util = item.get("utilization", {})
+        if util.get("percent") is None:
+            return (1, 999999, -item["count"])
+        return (0, -util.get("percent", 0), -item["count"])
+
+    for index, row in enumerate(sorted(rows, key=pie_sort_key)):
         if not row["count"] or not total:
             continue
         pct = row["count"] / total * 100

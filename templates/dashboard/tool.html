@@ -48,6 +48,7 @@
         <label>Username <input name="username" value="{{ defaults.username }}" required></label>
         <label>Password <input name="password" type="password" required></label>
         <label>Last-Mile Switch IP <input name="lastmile_ip" value="{{ defaults.lastmile_ip }}" data-lastmile-ip required></label>
+        <button class="secondary-button fetch-ports-button" type="button" data-fetch-lastmile-ports>Fetch Ports</button>
         <input type="hidden" name="port" value="{{ defaults.port }}" data-lastmile-port required>
         <div class="interface-fetch-status" data-interface-status>Enter username, password, and switch IP to fetch ports.</div>
         <div class="port-picker" data-port-picker>

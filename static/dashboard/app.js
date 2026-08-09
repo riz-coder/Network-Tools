@@ -657,6 +657,7 @@
     var dcMacPie = document.querySelector("[data-dc-mac-pie]");
     var dcMacTotal = document.querySelector("[data-dc-mac-total]");
     var dcMacLegend = document.querySelector("[data-dc-mac-pie-legend]");
+    var dcMacTooltip = document.querySelector("[data-dc-mac-slice-tooltip]");
     var macTooltip = qs(macDashboard, "[data-mac-slice-tooltip]");
     var macUpdateAllForm = qs(macDashboard, "[data-mac-update-all-form]");
     var macUpdateStatus = qs(macDashboard, "[data-mac-update-status]");
@@ -665,12 +666,20 @@
     if (macSegmentsScript) {
       try { macSegments = JSON.parse(macSegmentsScript.textContent || "[]"); } catch (error) { macSegments = []; }
     }
+    var dcMacSegments = [];
+    var dcMacSegmentsScript = document.getElementById("dcMacPieSegments");
+    if (dcMacSegmentsScript) {
+      try { dcMacSegments = JSON.parse(dcMacSegmentsScript.textContent || "[]"); } catch (error) { dcMacSegments = []; }
+    }
     function setMacSegments(segments) {
       macSegments = Array.isArray(segments) ? segments : [];
     }
-    function findMacSegmentFromEvent(event) {
-      if (!macPie || !macSegments.length) return null;
-      var rect = macPie.getBoundingClientRect();
+    function setDcMacSegments(segments) {
+      dcMacSegments = Array.isArray(segments) ? segments : [];
+    }
+    function findPieSegmentFromEvent(event, pie, segments) {
+      if (!pie || !segments.length) return null;
+      var rect = pie.getBoundingClientRect();
       var centerX = rect.left + rect.width / 2;
       var centerY = rect.top + rect.height / 2;
       var dx = event.clientX - centerX;
@@ -682,11 +691,31 @@
       var angle = (Math.atan2(dy, dx) * 180 / Math.PI + 450) % 360;
       var percent = angle / 360 * 100;
       var cumulative = 0;
-      for (var i = 0; i < macSegments.length; i += 1) {
-        cumulative += Number(macSegments[i].percent) || 0;
-        if (percent <= cumulative) return macSegments[i];
+      for (var i = 0; i < segments.length; i += 1) {
+        cumulative += Number(segments[i].percent) || 0;
+        if (percent <= cumulative) return segments[i];
       }
-      return macSegments[macSegments.length - 1];
+      return segments[segments.length - 1];
+    }
+    function findMacSegmentFromEvent(event) {
+      return findPieSegmentFromEvent(event, macPie, macSegments);
+    }
+    function bindMacPieTooltip(pie, tooltip, segmentsGetter) {
+      if (!pie || !tooltip) return;
+      pie.addEventListener("mousemove", function (event) {
+        var item = findPieSegmentFromEvent(event, pie, segmentsGetter());
+        if (!item) {
+          tooltip.classList.remove("show");
+          return;
+        }
+        tooltip.textContent = item.name + " - " + item.count + " | " + (item.utilization || "N/A") + " utilized";
+        tooltip.style.left = (event.clientX + 12) + "px";
+        tooltip.style.top = (event.clientY + 12) + "px";
+        tooltip.classList.add("show");
+      });
+      pie.addEventListener("mouseleave", function () {
+        tooltip.classList.remove("show");
+      });
     }
     if (macPie && macTooltip) {
       macPie.addEventListener("mousemove", function (event) {
@@ -704,6 +733,7 @@
         macTooltip.classList.remove("show");
       });
     }
+    bindMacPieTooltip(dcMacPie, dcMacTooltip, function () { return dcMacSegments; });
     function renderMacLegendItem(item) {
       var level = item.utilization_level || "unknown";
       var value = Number(item.utilization_value) || 0;
@@ -759,6 +789,7 @@
               }).join("") : "<span><i></i>No MAC data yet</span>";
             }
             updateMacPanel(dcMacPie, dcMacTotal, dcMacLegend, data.dc_dashboard);
+            if (data.dc_dashboard && data.dc_dashboard.pie_segments) setDcMacSegments(data.dc_dashboard.pie_segments);
             if (data.pie_segments) setMacSegments(data.pie_segments);
           })
           .catch(function (error) {
@@ -848,7 +879,7 @@
   var lmCount = qs(lastmileForm, "[data-port-count]");
   var lmSelectedLabel = qs(lastmileForm, "[data-selected-port]");
   var lmSelectedInfo = qs(lastmileForm, "[data-selected-port-info]");
-  var lmTimer = null;
+  var lmFetchButton = qs(lastmileForm, "[data-fetch-lastmile-ports]");
   var lmLastFetchKey = "";
 
   function setLmStatus(kind, text) {
@@ -942,13 +973,13 @@
     if (row) selectPort(row);
   });
 
-  function fetchPorts() {
+  function fetchPorts(force) {
     var key = lmUsername.value.trim() + "|" + lmPassword.value + "|" + lmSwitchIp.value.trim();
     if (!lmUsername.value.trim() || !lmPassword.value || !lmSwitchIp.value.trim()) {
       setLmStatus("", "Enter username, password, and switch IP to fetch ports.");
       return;
     }
-    if (key === lmLastFetchKey) return;
+    if (!force && key === lmLastFetchKey) return;
     lmLastFetchKey = key;
     lmPortInput.value = "";
     lmSelectedLabel.textContent = "No port selected";
@@ -976,15 +1007,21 @@
       });
   }
 
-  function scheduleFetch() {
-    window.clearTimeout(lmTimer);
-    lmTimer = window.setTimeout(fetchPorts, 700);
-  }
-
   [lmUsername, lmPassword, lmSwitchIp].forEach(function (field) {
-    field.addEventListener("input", scheduleFetch);
-    field.addEventListener("change", scheduleFetch);
+    field.addEventListener("input", function () {
+      lmLastFetchKey = "";
+      validateLastmile();
+    });
+    field.addEventListener("change", function () {
+      lmLastFetchKey = "";
+      validateLastmile();
+    });
   });
+  if (lmFetchButton) {
+    lmFetchButton.addEventListener("click", function () {
+      fetchPorts(true);
+    });
+  }
   [lmVlanInput, lmVlanName].forEach(function (field) {
     field.addEventListener("input", validateLastmile);
     field.addEventListener("change", validateLastmile);

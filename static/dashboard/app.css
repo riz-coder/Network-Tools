@@ -1019,6 +1019,10 @@ button {
   color: #07100b;
 }
 .secondary-button { background: #1b272d; border-color: var(--line); color: #d8e0e4; }
+.fetch-ports-button {
+  width: 100%;
+  margin-top: -4px;
+}
 .field-message {
   min-height: 18px;
   margin-top: -7px;
@@ -1840,14 +1844,20 @@ html, body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+  align-items: stretch;
 }
 .mac-graph-block {
+  display: grid;
+  grid-template-rows: auto 1fr;
   min-width: 0;
 }
 .mac-graph-block .pie-wrap {
+  display: grid;
   grid-template-columns: 1fr !important;
-  min-height: 190px !important;
-  gap: 10px;
+  grid-template-rows: 230px 1fr;
+  min-height: 410px !important;
+  gap: 12px;
+  align-items: start;
 }
 .combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart {
   width: 190px !important;
@@ -1862,9 +1872,11 @@ html, body {
   inset: 24% !important;
 }
 .mac-graph-block .pie-legend {
-  max-height: 150px;
+  height: 178px;
+  max-height: 178px;
   overflow-y: auto;
   padding-right: 4px;
+  align-self: stretch;
 }
 .combined-update-form {
   width: min(520px, 100%);
@@ -2229,4 +2241,72 @@ body.light-theme .mac-util-row small {
 }
 body.light-theme .mac-util-row b {
   background: rgba(112, 95, 80, .12);
+}
+
+/* Light theme deployment/last-mile readability fixes */
+body.light-theme .field-message,
+body.light-theme .field-message.ok {
+  color: #178a4f;
+}
+body.light-theme .interface-fetch-status,
+body.light-theme .selected-port-label,
+body.light-theme .port-list,
+body.light-theme .port-empty,
+body.light-theme .region-summary,
+body.light-theme .selected-regions {
+  background: #fffdf8 !important;
+  border-color: #d9b98f !important;
+  color: #20150d !important;
+}
+body.light-theme .interface-fetch-status.loading {
+  background: #fff4e6 !important;
+  border-color: rgba(255, 122, 0, .55) !important;
+  color: #b45b00 !important;
+}
+body.light-theme .interface-fetch-status.success {
+  background: rgba(23, 138, 79, .09) !important;
+  border-color: rgba(23, 138, 79, .48) !important;
+  color: #178a4f !important;
+}
+body.light-theme .interface-fetch-status.error {
+  background: rgba(199, 55, 55, .08) !important;
+  border-color: rgba(199, 55, 55, .5) !important;
+  color: #9d2222 !important;
+}
+body.light-theme .selected-port-info {
+  background: rgba(23, 138, 79, .08) !important;
+  border-color: rgba(23, 138, 79, .42) !important;
+  color: #20150d !important;
+}
+body.light-theme .selected-port-info strong {
+  color: #178a4f !important;
+}
+body.light-theme .selected-port-info span,
+body.light-theme .selected-port-info small,
+body.light-theme .port-list,
+body.light-theme .port-empty,
+body.light-theme .selected-port-label,
+body.light-theme .region-summary {
+  color: #5f4d3f !important;
+}
+body.light-theme .port-option strong,
+body.light-theme .port-option .port-name,
+body.light-theme .region-chip span,
+body.light-theme .region-chip strong {
+  color: #20150d !important;
+}
+body.light-theme .port-option .port-meta {
+  color: #4f4034 !important;
+}
+body.light-theme .port-option .status-connected {
+  color: #178a4f !important;
+}
+body.light-theme .port-option .status-disabled,
+body.light-theme .port-option .status-notconnect,
+body.light-theme .port-option .status-suspended {
+  color: #b51f1f !important;
+}
+body.light-theme .apply-regions-button.ready {
+  background: linear-gradient(90deg, rgba(255, 122, 0, .22), rgba(255, 122, 0, .38)) !important;
+  color: #20150d !important;
 }

@@ -49,7 +49,9 @@
         <div class="pie-wrap">
             <div class="pie-chart mac-pie-chart" data-dc-mac-pie style="background: conic-gradient({{ dc_oc_mac_dashboard.pie_gradient }});">
               <span data-dc-mac-total>{{ dc_oc_mac_dashboard.total_display }}</span>
+              <div class="mac-slice-tooltip" data-dc-mac-slice-tooltip></div>
             </div>
+            {{ dc_oc_mac_dashboard.pie_segments|json_script:"dcMacPieSegments" }}
           <div class="pie-legend" data-dc-mac-pie-legend>
             {% if dc_oc_mac_dashboard.pie_segments %}
               {% for item in dc_oc_mac_dashboard.pie_segments %}
