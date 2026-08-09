@@ -654,6 +654,9 @@
     var macTotal = qs(macDashboard, "[data-mac-total]");
     var macPie = qs(macDashboard, ".mac-pie-chart");
     var macLegend = qs(macDashboard, "[data-mac-pie-legend]");
+    var dcMacPie = document.querySelector("[data-dc-mac-pie]");
+    var dcMacTotal = document.querySelector("[data-dc-mac-total]");
+    var dcMacLegend = document.querySelector("[data-dc-mac-pie-legend]");
     var macTooltip = qs(macDashboard, "[data-mac-slice-tooltip]");
     var macUpdateAllForm = qs(macDashboard, "[data-mac-update-all-form]");
     var macUpdateStatus = qs(macDashboard, "[data-mac-update-status]");
@@ -712,6 +715,16 @@
         + '<small>' + (item.utilization || "N/A") + ' utilized</small>'
         + '</span>';
     }
+    function updateMacPanel(pie, totalNode, legendNode, dashboardData) {
+      if (!dashboardData) return;
+      if (pie && dashboardData.pie_gradient) pie.style.background = "conic-gradient(" + dashboardData.pie_gradient + ")";
+      if (totalNode && dashboardData.total_display) totalNode.textContent = dashboardData.total_display;
+      if (legendNode && dashboardData.pie_segments) {
+        legendNode.innerHTML = dashboardData.pie_segments.length ? dashboardData.pie_segments.map(function (item) {
+          return renderMacLegendItem(item);
+        }).join("") : "<span><i></i>No MAC data yet</span>";
+      }
+    }
     if (macUpdateAllForm) {
       macUpdateAllForm.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -745,6 +758,7 @@
                 return renderMacLegendItem(item);
               }).join("") : "<span><i></i>No MAC data yet</span>";
             }
+            updateMacPanel(dcMacPie, dcMacTotal, dcMacLegend, data.dc_dashboard);
             if (data.pie_segments) setMacSegments(data.pie_segments);
           })
           .catch(function (error) {

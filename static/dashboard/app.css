@@ -1810,9 +1810,29 @@ html, body {
 }
 .overview-widgets {
   display: grid;
-  grid-template-columns: 420px minmax(280px, 420px);
+  grid-template-columns: 420px 420px minmax(280px, 420px);
   gap: 16px;
   align-items: start;
+}
+.dc-oc-dashboard .mac-pie-panel {
+  min-height: 360px !important;
+  padding: 12px;
+}
+.dc-oc-dashboard .pie-wrap {
+  grid-template-columns: 1fr !important;
+  min-height: 190px !important;
+  gap: 10px;
+}
+.dc-oc-dashboard .pie-chart.mac-pie-chart {
+  width: 190px !important;
+  height: 190px !important;
+}
+.dc-oc-dashboard .pie-chart.mac-pie-chart span {
+  font-size: 20px !important;
+}
+.dc-oc-dashboard .pie-legend {
+  max-height: 196px;
+  overflow-y: auto;
 }
 .active-operators-panel {
   width: 100%;

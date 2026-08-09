@@ -69,6 +69,7 @@ def home(request):
         _context(
             activity=services.overview_activity(),
             mac_dashboard=services.mac_dashboard(),
+            dc_oc_mac_dashboard=services.dc_oc_mac_dashboard(),
         ),
     )
 

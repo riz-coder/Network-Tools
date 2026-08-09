@@ -54,6 +54,13 @@ ROOT_SWITCHES = [
     {"name": "Karimabad", "ip": "10.101.98.112"},
     {"name": "MAS", "ip": "10.101.99.55"},
 ]
+DC_OC_SWITCHES = [
+    {"name": "DC/OC-95.251", "ip": "10.101.95.251"},
+    {"name": "DC/OC-95.252", "ip": "10.101.95.252"},
+    {"name": "DC/OC-95.100", "ip": "10.101.95.100"},
+    {"name": "DC/OC-95.101", "ip": "10.101.95.101"},
+    {"name": "DC/OC-150.36", "ip": "172.16.150.36"},
+]
 
 
 def user_color(username, index=0):
@@ -347,11 +354,11 @@ def fetch_root_switch_mac(ip, username, password):
     return {"ok": True, "hostname": hostname or ip, "model": model, "count": count, "count_display": format_mac_count(count), "raw": raw}
 
 
-def mac_dashboard():
+def mac_dashboard_for(switches):
     cache = _read_mac_cache()
     rows = []
     total = 0
-    for switch in ROOT_SWITCHES:
+    for switch in switches:
         row = cache.get(switch["ip"], {})
         count = int(row.get("count", 0) or 0)
         total += count
@@ -400,8 +407,17 @@ def mac_dashboard():
     }
 
 
+def mac_dashboard():
+    return mac_dashboard_for(ROOT_SWITCHES)
+
+
+def dc_oc_mac_dashboard():
+    return mac_dashboard_for(DC_OC_SWITCHES)
+
+
 def update_mac_cache_for_switch(ip, username, password):
-    switch = next((item for item in ROOT_SWITCHES if item["ip"] == ip), None)
+    all_switches = ROOT_SWITCHES + DC_OC_SWITCHES
+    switch = next((item for item in all_switches if item["ip"] == ip), None)
     if not switch:
         return {"ok": False, "message": "Unknown root switch IP."}
     result = fetch_root_switch_mac(ip, username, password)
@@ -438,17 +454,19 @@ def update_mac_cache_for_switch(ip, username, password):
 
 def update_all_mac_cache(username, password):
     results = []
-    for switch in ROOT_SWITCHES:
+    for switch in ROOT_SWITCHES + DC_OC_SWITCHES:
         results.append(update_mac_cache_for_switch(switch["ip"], username, password))
     dashboard = mac_dashboard()
+    dc_dashboard = dc_oc_mac_dashboard()
     ok_count = sum(1 for row in results if row.get("ok"))
     return {
         "ok": ok_count > 0,
-        "message": f"Updated {ok_count}/{len(ROOT_SWITCHES)} root switches.",
+        "message": f"Updated {ok_count}/{len(ROOT_SWITCHES) + len(DC_OC_SWITCHES)} switches.",
         "total": dashboard["total_display"],
         "rows": dashboard["rows"],
         "pie_gradient": dashboard["pie_gradient"],
         "pie_segments": dashboard["pie_segments"],
+        "dc_dashboard": dc_dashboard,
     }
 
 

@@ -45,6 +45,35 @@
         <div class="mac-update-status" data-mac-update-status></div>
       </div>
   </section>
+  <section class="mac-dashboard mac-dashboard-single dc-oc-dashboard">
+      <div class="mac-pie-panel">
+        <div class="panel-title">
+          <div>
+            <span class="eyebrow">DC/OC</span>
+            <h3>MAC distribution</h3>
+          </div>
+        </div>
+        <div class="pie-wrap">
+            <div class="pie-chart mac-pie-chart" data-dc-mac-pie style="background: conic-gradient({{ dc_oc_mac_dashboard.pie_gradient }});">
+              <span data-dc-mac-total>{{ dc_oc_mac_dashboard.total_display }}</span>
+            </div>
+          <div class="pie-legend" data-dc-mac-pie-legend>
+            {% if dc_oc_mac_dashboard.pie_segments %}
+              {% for item in dc_oc_mac_dashboard.pie_segments %}
+                <span class="mac-util-row mac-util-{{ item.utilization_level }}" title="{{ item.name }} - {{ item.count }} MACs | {{ item.model }} | {{ item.utilization }} utilized">
+                  <em><i style="background: {{ item.color }}"></i>{{ item.name }} - {{ item.count }}</em>
+                  <small>{{ item.model }} / {{ item.capacity }} capacity</small>
+                  <b><strong style="width: {{ item.utilization_value }}%"></strong></b>
+                  <small>{{ item.utilization }} utilized</small>
+                </span>
+              {% endfor %}
+            {% else %}
+              <span><i></i>No MAC data yet</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+  </section>
   <section class="overview-panel active-operators-panel">
     <div class="panel-title">
       <div>
