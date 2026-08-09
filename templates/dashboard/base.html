@@ -8,14 +8,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'dashboard/app.css' %}?v=83">
+  <link rel="stylesheet" href="{% static 'dashboard/app.css' %}?v=87">
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <a class="brand" href="{% url 'dashboard:home' %}">
         <span class="brand-mark">N</span>
-        <span class="brand-copy"><strong>NETWORK</strong><small>TOOLS</small></span>
+        <span class="brand-copy"><strong>NOC</strong><small>TOOLS</small></span>
       </a>
       <div class="nav-label">Workspace</div>
       <nav class="tool-nav">
@@ -50,7 +50,7 @@
         <button class="menu-button" id="menuButton" aria-label="Toggle navigation">Menu</button>
         <div>
           <div class="eyebrow">Operations Console</div>
-          <h1>{% block heading %}Network Tools{% endblock %}</h1>
+          <h1>{% block heading %}NOC Tools{% endblock %}</h1>
         </div>
         <div class="topbar-actions">
           <span class="topbar-user">{{ request.user.username }}</span>
@@ -64,7 +64,7 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-  <script src="{% static 'dashboard/app.js' %}?v=83"></script>
+  <script src="{% static 'dashboard/app.js' %}?v=87"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -226,18 +226,18 @@ html, body {
 }
 .main-area { grid-column: 2; min-width: 0; min-height: 100vh; }
 .topbar {
-  height: 76px;
+  min-height: 54px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 28px;
+  gap: 12px;
+  padding: 7px 24px;
   background: #0b1114;
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   z-index: 10;
 }
-.topbar h1 { margin: 4px 0 0; font-size: 18px; }
+.topbar h1 { margin: 2px 0 0; font-size: 17px; }
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -246,7 +246,7 @@ html, body {
 }
 .topbar-status { color: var(--muted); font-size: 12px; }
 .topbar-user {
-  min-height: 32px;
+  min-height: 30px;
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
@@ -258,7 +258,7 @@ html, body {
   font-weight: 800;
 }
 .logout-button {
-  min-height: 32px;
+  min-height: 30px;
   padding: 0 11px;
   border: 1px solid rgba(232, 91, 91, .45);
   background: rgba(232, 91, 91, .1);
@@ -268,8 +268,8 @@ html, body {
 .menu-button { display: none; border: 1px solid var(--line); background: var(--panel); color: white; border-radius: 7px; padding: 8px 10px; }
 
 .dashboard-content, .tool-page {
-  padding: 26px;
-  max-width: 1420px;
+  padding: clamp(14px, 1.9vw, 24px);
+  max-width: 100%;
   margin: 0 auto;
 }
 .hero-card {
@@ -505,14 +505,14 @@ html, body {
 }
 .minimal-overview {
   display: grid;
-  gap: 28px;
+  gap: clamp(14px, 2vh, 22px);
   min-height: calc(100vh - 76px);
   align-content: start;
-  padding-top: 18px;
+  padding-top: clamp(8px, 1.5vh, 16px);
 }
 .connect-noc-center {
   width: 100%;
-  min-height: 110px;
+  min-height: clamp(68px, 10vh, 96px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -524,16 +524,16 @@ html, body {
   position: relative;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: clamp(42px, 4.4vw, 56px);
+  height: clamp(42px, 4.4vw, 56px);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 28px rgba(255, 138, 31, .55);
 }
 .connect-logo-mark i {
   position: relative;
-  width: 27px;
-  height: 23px;
+  width: clamp(20px, 2.1vw, 27px);
+  height: clamp(17px, 1.8vw, 23px);
   display: block;
   background: #fff;
   border-radius: 2px;
@@ -548,12 +548,12 @@ html, body {
   background: #fff;
 }
 .connect-wordmark {
-  color: #120d08;
-  font-size: clamp(30px, 4vw, 56px);
+  color: #ff8a1f;
+  font-size: clamp(28px, 3.3vw, 46px);
   font-weight: 950;
   letter-spacing: .08em;
   line-height: 1;
-  text-shadow: 0 0 18px rgba(255, 138, 31, .35);
+  text-shadow: 0 0 18px rgba(255, 138, 31, .45), 0 2px 0 rgba(0, 0, 0, .55);
 }
 .user-activity-only {
   width: 100%;
@@ -1638,6 +1638,50 @@ pre {
   .combined-mac-grid { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 1180px) {
+  .overview-widgets {
+    grid-template-columns: 1fr !important;
+  }
+  .active-operators-panel {
+    min-height: 0;
+  }
+  .operator-bar-chart {
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 901px) {
+  .minimal-overview {
+    gap: 12px;
+    padding-top: 6px;
+  }
+  .connect-noc-center {
+    min-height: 62px;
+  }
+  .connect-wordmark {
+    font-size: clamp(24px, 3vw, 40px);
+  }
+  .connect-logo-mark {
+    width: 42px;
+    height: 42px;
+  }
+  .mac-graph-block .pie-wrap {
+    grid-template-rows: auto 1fr;
+    min-height: 0 !important;
+  }
+  .combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart {
+    width: clamp(155px, 15vw, 185px) !important;
+    height: clamp(155px, 15vw, 185px) !important;
+    max-width: clamp(155px, 15vw, 185px) !important;
+  }
+  .mac-graph-block .pie-legend {
+    height: clamp(128px, 19vh, 168px);
+    max-height: clamp(128px, 19vh, 168px);
+  }
+}
+
 /* Cool orange flat theme */
 :root {
   --bg: #080d10;
@@ -1815,8 +1859,8 @@ html, body {
 }
 .overview-widgets {
   display: grid;
-  grid-template-columns: minmax(720px, 1fr) minmax(280px, 420px);
-  gap: 16px;
+  grid-template-columns: minmax(min(100%, 720px), 1fr) minmax(260px, clamp(280px, 24vw, 360px));
+  gap: clamp(12px, 1.4vw, 16px);
   align-items: start;
   width: 100% !important;
   max-width: none !important;
@@ -1838,12 +1882,12 @@ html, body {
   width: 100% !important;
   max-width: none !important;
   min-height: 0 !important;
-  padding: 12px;
+  padding: clamp(10px, 1.2vw, 14px);
 }
 .combined-mac-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: clamp(18px, 2vw, 26px);
   align-items: stretch;
 }
 .mac-graph-block {
@@ -1854,26 +1898,26 @@ html, body {
 .mac-graph-block .pie-wrap {
   display: grid;
   grid-template-columns: 1fr !important;
-  grid-template-rows: 230px 1fr;
-  min-height: 410px !important;
-  gap: 12px;
+  grid-template-rows: auto 1fr;
+  min-height: 0 !important;
+  gap: 14px;
   align-items: start;
 }
 .combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart {
-  width: 190px !important;
-  height: 190px !important;
-  max-width: 190px !important;
+  width: clamp(165px, 16vw, 205px) !important;
+  height: clamp(165px, 16vw, 205px) !important;
+  max-width: clamp(165px, 16vw, 205px) !important;
   justify-self: center;
 }
 .combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart span {
-  font-size: 20px !important;
+  font-size: clamp(17px, 1.6vw, 20px) !important;
 }
 .combined-mac-panel .mac-graph-block .pie-chart.mac-pie-chart::after {
   inset: 24% !important;
 }
 .mac-graph-block .pie-legend {
-  height: 178px;
-  max-height: 178px;
+  height: clamp(140px, 21vh, 178px);
+  max-height: clamp(140px, 21vh, 178px);
   overflow-y: auto;
   padding-right: 4px;
   align-self: stretch;
