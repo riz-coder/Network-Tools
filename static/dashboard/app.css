@@ -1631,6 +1631,7 @@ pre {
   .activity-message { white-space: normal; }
   .region-grid, .selected-port-info, .pie-wrap, .ios-report-grid { grid-template-columns: 1fr; }
   .overview-widgets { grid-template-columns: 1fr; }
+  .combined-mac-grid { grid-template-columns: 1fr; }
 }
 
 /* Cool orange flat theme */
@@ -1810,9 +1811,50 @@ html, body {
 }
 .overview-widgets {
   display: grid;
-  grid-template-columns: 420px 420px minmax(280px, 420px);
+  grid-template-columns: minmax(720px, 860px) minmax(280px, 420px);
   gap: 16px;
   align-items: start;
+}
+.mac-dashboard-combined {
+  width: 100%;
+}
+.combined-mac-panel {
+  min-height: 0 !important;
+  padding: 12px;
+}
+.combined-mac-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.mac-graph-block {
+  min-width: 0;
+}
+.mac-graph-block .pie-wrap {
+  grid-template-columns: 1fr !important;
+  min-height: 190px !important;
+  gap: 10px;
+}
+.mac-graph-block .pie-chart.mac-pie-chart {
+  width: 190px !important;
+  height: 190px !important;
+}
+.mac-graph-block .pie-chart.mac-pie-chart span {
+  font-size: 20px !important;
+}
+.mac-graph-block .pie-legend {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.combined-update-form {
+  width: min(520px, 100%);
+  margin: 14px auto 0;
+  grid-template-columns: 1fr !important;
+}
+.combined-mac-panel .mac-update-status {
+  width: min(520px, 100%);
+  margin: 8px auto 0;
 }
 .dc-oc-dashboard .mac-pie-panel {
   min-height: 360px !important;

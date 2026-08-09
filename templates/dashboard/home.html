@@ -7,8 +7,10 @@
   </div>
 
   <div class="overview-widgets">
-  <section class="mac-dashboard mac-dashboard-single" data-mac-dashboard data-mac-update-all-url="{% url 'dashboard:mac_update_all' %}">
-      <div class="mac-pie-panel">
+  <section class="mac-dashboard mac-dashboard-combined" data-mac-dashboard data-mac-update-all-url="{% url 'dashboard:mac_update_all' %}">
+      <div class="mac-pie-panel combined-mac-panel">
+        <div class="combined-mac-grid">
+        <div class="mac-graph-block">
         <div class="panel-title">
           <div>
             <span class="eyebrow">Root Switches</span>
@@ -36,17 +38,8 @@
             {% endif %}
           </div>
         </div>
-        <form class="mac-credentials mac-update-all-form" data-mac-update-all-form>
-          {% csrf_token %}
-          <input name="mac_username" placeholder="Telnet username">
-          <input name="mac_password" type="password" placeholder="Telnet password">
-          <button class="primary-button" type="submit" data-mac-update-all>Update All Switches</button>
-        </form>
-        <div class="mac-update-status" data-mac-update-status></div>
       </div>
-  </section>
-  <section class="mac-dashboard mac-dashboard-single dc-oc-dashboard">
-      <div class="mac-pie-panel">
+        <div class="mac-graph-block dc-oc-dashboard">
         <div class="panel-title">
           <div>
             <span class="eyebrow">DC/OC</span>
@@ -72,6 +65,15 @@
             {% endif %}
           </div>
         </div>
+      </div>
+        </div>
+        <form class="mac-credentials mac-update-all-form combined-update-form" data-mac-update-all-form>
+          {% csrf_token %}
+          <input name="mac_username" placeholder="Telnet username">
+          <input name="mac_password" type="password" placeholder="Telnet password">
+          <button class="primary-button" type="submit" data-mac-update-all>Update All Switches</button>
+        </form>
+        <div class="mac-update-status" data-mac-update-status></div>
       </div>
   </section>
   <section class="overview-panel active-operators-panel">
