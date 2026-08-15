@@ -24,13 +24,20 @@
       <p class="muted-line">{{ total_users }} total users</p>
       <div class="existing-user-list">
         {% for user_obj in all_users %}
-          <form method="post" action="{% url 'dashboard:add_user' %}" class="existing-user-row">
-            {% csrf_token %}
-            <input type="hidden" name="username" value="{{ user_obj.username }}">
+          <div class="existing-user-row">
             <span class="existing-user-pill" style="--user-color: {{ user_obj.color }}">{{ user_obj.username }}</span>
-            <input name="password" type="password" placeholder="New password" required>
-            <button class="secondary-button" type="submit">Change Password</button>
-          </form>
+            <form method="post" action="{% url 'dashboard:add_user' %}" class="existing-password-form">
+              {% csrf_token %}
+              <input type="hidden" name="username" value="{{ user_obj.username }}">
+              <input name="password" type="password" placeholder="New password" required>
+              <button class="secondary-button" type="submit">Change Password</button>
+            </form>
+            <form method="post" action="{% url 'dashboard:delete_user' %}" class="existing-delete-form" onsubmit="return confirm('Delete user {{ user_obj.username }} from database?');">
+              {% csrf_token %}
+              <input type="hidden" name="username" value="{{ user_obj.username }}">
+              <button class="danger-button" type="submit" {% if user_obj.username == 'rizwan' %}disabled title="Root user cannot be deleted"{% endif %}>Delete</button>
+            </form>
+          </div>
         {% endfor %}
       </div>
     </section>

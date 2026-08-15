@@ -172,6 +172,7 @@ html, body {
   display: grid;
   grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
   gap: 18px;
+  align-items: start;
 }
 .user-action-form {
   display: grid;
@@ -189,7 +190,7 @@ html, body {
 }
 .existing-user-row {
   display: grid;
-  grid-template-columns: 140px minmax(180px, 1fr) 150px;
+  grid-template-columns: 140px minmax(240px, 1fr) 92px;
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -215,6 +216,27 @@ html, body {
 .existing-user-row button {
   min-height: 36px;
   font-size: 12px;
+}
+.existing-password-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 150px;
+  gap: 10px;
+}
+.existing-delete-form {
+  display: grid;
+}
+.danger-button {
+  min-height: 36px;
+  border-color: rgba(232, 91, 91, .52);
+  background: rgba(232, 91, 91, .14);
+  color: #ffd3d3;
+}
+.danger-button:hover {
+  background: rgba(232, 91, 91, .24);
+}
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 .status-dot {
   display: inline-block;
@@ -1629,7 +1651,7 @@ pre {
   .stats-grid, .overview-grid { grid-template-columns: 1fr; }
   .mac-dashboard, .mac-region-grid, .mac-credentials { grid-template-columns: 1fr; }
   .mac-pie-panel .pie-wrap { grid-template-columns: 1fr; }
-  .users-management-grid, .existing-user-row { grid-template-columns: 1fr; }
+  .users-management-grid, .existing-user-row, .existing-password-form { grid-template-columns: 1fr; }
   .noc-header { align-items: flex-start; flex-direction: column; }
   .activity-row { grid-template-columns: 1fr; }
   .activity-message { white-space: normal; }
@@ -2207,6 +2229,14 @@ body.light-theme .secondary-button {
   background: #fffaf2;
   border-color: #d4a56b;
   color: #20150d;
+}
+body.light-theme .danger-button {
+  background: rgba(199, 55, 55, .08);
+  border-color: rgba(199, 55, 55, .45);
+  color: #9d2222;
+}
+body.light-theme .danger-button:hover {
+  background: rgba(199, 55, 55, .14);
 }
 body.light-theme .live-copy-preview,
 body.light-theme .live-terminal,

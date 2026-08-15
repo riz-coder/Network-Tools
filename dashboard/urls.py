@@ -14,5 +14,6 @@ urlpatterns = [
     path("api/mac/update/", views.mac_update, name="mac_update"),
     path("api/mac/update-all/", views.mac_update_all, name="mac_update_all"),
     path("users/add/", views.add_user, name="add_user"),
+    path("users/delete/", views.delete_user, name="delete_user"),
     path("health/", views.health, name="health"),
 ]

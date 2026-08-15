@@ -236,3 +236,14 @@ def add_user(request):
             user.is_active = True
             user.save()
     return redirect("dashboard:users")
+
+
+@login_required
+def delete_user(request):
+    if request.user.username != "rizwan":
+        return redirect("dashboard:home")
+    if request.method == "POST":
+        username = request.POST.get("username", "").strip()
+        if username and username != "rizwan":
+            User.objects.filter(username=username).delete()
+    return redirect("dashboard:users")
