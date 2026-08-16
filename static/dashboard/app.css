@@ -2284,19 +2284,19 @@ html, body {
 
 /* Light theme */
 body.light-theme {
-  --bg: #f5f0e8;
-  --panel: #fff8ef;
-  --panel-2: #fff1df;
-  --line: #e5cdb1;
-  --text: #20150d;
-  --muted: #705f50;
+  --bg: #f7f3ea;
+  --panel: #fffaf2;
+  --panel-2: #fff0dc;
+  --line: #e7c9a6;
+  --text: #1f140b;
+  --muted: #6f5b48;
   --accent: #ff7a00;
   --good: #178a4f;
   --warn: #b58100;
   --bad: #c73737;
   background:
     radial-gradient(circle at top left, rgba(255, 122, 0, .16), transparent 34%),
-    #f5f0e8;
+    #f7f3ea;
   color: var(--text);
 }
 body.light-theme .sidebar,
@@ -2317,21 +2317,45 @@ body.light-theme .login-card {
   color: var(--text);
 }
 body.light-theme .sidebar {
-  background: #fff3e3;
+  background: #071014;
+  border-color: rgba(255, 122, 0, .22);
+  color: #f7fbff;
+}
+body.light-theme .sidebar .brand-copy strong,
+body.light-theme .sidebar .brand-copy span,
+body.light-theme .sidebar .brand,
+body.light-theme .sidebar .nav-label,
+body.light-theme .sidebar .sidebar-user-count,
+body.light-theme .sidebar .sidebar-footer {
+  color: #eaf6ff;
+}
+body.light-theme .sidebar .brand-copy small,
+body.light-theme .sidebar .nav-icon,
+body.light-theme .sidebar .sidebar-users .eyebrow {
+  color: var(--accent);
 }
 body.light-theme .main-area,
 body.light-theme html,
 body.light-theme body {
   background: transparent;
 }
-body.light-theme .nav-item {
-  color: #4f3e31;
+body.light-theme .sidebar .nav-item {
+  color: #d8edf7;
+  background: transparent;
+  border-color: transparent;
 }
-body.light-theme .nav-item:hover,
-body.light-theme .nav-item.active {
-  background: rgba(255, 122, 0, .15);
-  border-color: rgba(255, 122, 0, .42);
-  color: #20150d;
+body.light-theme .sidebar .nav-item:hover,
+body.light-theme .sidebar .nav-item.active {
+  background: rgba(255, 122, 0, .18);
+  border-color: rgba(255, 122, 0, .55);
+  color: #fff;
+}
+body.light-theme .sidebar .nav-item:hover .nav-label,
+body.light-theme .sidebar .nav-item.active .nav-label {
+  color: #fff;
+}
+body.light-theme .sidebar .sidebar-separator {
+  border-color: rgba(255, 255, 255, .12);
 }
 body.light-theme .brand,
 body.light-theme .topbar h1,
@@ -2378,8 +2402,8 @@ body.light-theme .logout-button {
 }
 body.light-theme .theme-toggle {
   background: rgba(255, 122, 0, .16);
-  border-color: rgba(255, 122, 0, .45);
-  color: #20150d;
+  border-color: rgba(255, 122, 0, .55);
+  color: #fff;
 }
 body.light-theme .pie-legend span,
 body.light-theme .user-pill,
