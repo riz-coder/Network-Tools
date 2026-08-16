@@ -44,6 +44,26 @@
     });
   }
 
+  qsa(document, 'input[type="password"]').forEach(function (input) {
+    if (input.closest(".password-toggle-wrap")) return;
+    var wrap = document.createElement("span");
+    wrap.className = "password-toggle-wrap";
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "password-toggle-button";
+    button.setAttribute("aria-label", "Show password");
+    button.textContent = "👁";
+    button.addEventListener("click", function () {
+      var showing = input.type === "text";
+      input.type = showing ? "password" : "text";
+      button.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+      button.classList.toggle("active", !showing);
+    });
+    wrap.appendChild(button);
+  });
+
   function parseLiveJson(response) {
     var contentType = response.headers.get("content-type") || "";
     if (contentType.indexOf("application/json") === -1) {

@@ -1134,6 +1134,38 @@ input, textarea, select {
   font: inherit;
   font-size: 13px;
 }
+.password-toggle-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.password-toggle-wrap input {
+  padding-right: 46px;
+}
+.password-toggle-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+.password-toggle-button:hover,
+.password-toggle-button.active {
+  border-color: rgba(255, 138, 31, .38);
+  background: rgba(255, 138, 31, .12);
+  color: var(--accent);
+}
 select[multiple] { min-height: 210px; }
 textarea { resize: vertical; }
 button {
