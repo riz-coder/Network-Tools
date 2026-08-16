@@ -38,9 +38,15 @@ TOOLS = {
         "description": "Phase 1 audit for Cisco IOS image, model, and flash space",
         "icon": "IOS",
     },
+    "dealers-access-router": {
+        "name": "Access Switch",
+        "short_name": "Access Switch",
+        "description": "Access switch automation workspace",
+        "icon": "AS",
+    },
 }
 
-VISIBLE_TOOL_SLUGS = ("corporate-deployment", "p2p-testing", "cisco-ios-uploader")
+VISIBLE_TOOL_SLUGS = ("corporate-deployment", "p2p-testing", "cisco-ios-uploader", "dealers-access-router")
 
 
 def _context(active_tool=None, **extra):
@@ -82,6 +88,15 @@ def users(request):
 
 
 @login_required
+def access_switch_config(request):
+    return render(
+        request,
+        "dashboard/access_switch_config.html",
+        _context("dealers-access-router", access_switch_phase1=request.session.get("access_switch_phase1", {})),
+    )
+
+
+@login_required
 def tool(request, tool_slug):
     if tool_slug not in TOOLS:
         raise Http404("Tool not found")
@@ -114,9 +129,21 @@ def tool(request, tool_slug):
                 result = services.cisco_ios_phase1(request.POST)
             elif action == "ios_upload":
                 result = services.cisco_ios_upload(request.POST)
+            elif action == "dealers_access_phase1":
+                result = services.dealer_access_switch_phase1(request.POST)
+                dealer_switch = result.get("dealer_switch") if isinstance(result, dict) else None
+                if result.get("kind") == "success" and dealer_switch:
+                    request.session["access_switch_phase1"] = {
+                        "username": request.POST.get("username", "").strip(),
+                        "password": request.POST.get("password", ""),
+                        "switch_ip": dealer_switch.get("switch_ip", request.POST.get("switch_ip", "").strip()),
+                        "cdp_message": dealer_switch.get("cdp", {}).get("message", ""),
+                        "cdp_noc_switch": dealer_switch.get("cdp", {}).get("noc_switch", False),
+                        "ios_required": dealer_switch.get("ios_decision", {}).get("required", False),
+                    }
             else:
                 result = services.message("error", "Unknown action.")
-            if action in {"span_vlan", "apply_lastmile", "p2p_test", "single_switch_test", "ios_phase1", "ios_upload"}:
+            if action in {"span_vlan", "apply_lastmile", "p2p_test", "single_switch_test", "ios_phase1", "ios_upload", "dealers_access_phase1"}:
                 services.log_activity(
                     request.POST.get("username", "").strip(),
                     tool_slug,
@@ -128,6 +155,7 @@ def tool(request, tool_slug):
                         "single_switch_test": "Single Switch Test",
                         "ios_phase1": "Cisco IOS Phase 1",
                         "ios_upload": "Cisco IOS Upload",
+                        "dealers_access_phase1": "Access Switch Phase 1",
                     }.get(action, action),
                     result,
                 )
@@ -162,6 +190,18 @@ def lastmile_interfaces(request):
         request.POST.get("password", ""),
     )
     return JsonResponse({"ok": ok, "message": msg, "ports": ports, "raw": raw})
+
+
+@login_required
+def telnet_check(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "message": "POST required."}, status=405)
+    ok, msg = services.check_telnet_access(
+        request.POST.get("switch_ip", request.POST.get("lastmile_ip", "")).strip(),
+        request.POST.get("username", "").strip(),
+        request.POST.get("password", ""),
+    )
+    return JsonResponse({"ok": ok, "message": msg})
 
 
 @login_required

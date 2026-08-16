@@ -45,6 +45,7 @@
             <span class="eyebrow">DC/OC</span>
             <h3>MAC distribution</h3>
           </div>
+          <time class="mac-updated-time primary-updated-time" data-dc-mac-updated>{{ dc_oc_mac_dashboard.latest_updated_display }}</time>
         </div>
         <div class="pie-wrap">
             <div class="pie-chart mac-pie-chart" data-dc-mac-pie style="background: conic-gradient({{ dc_oc_mac_dashboard.pie_gradient }});">
@@ -103,6 +104,28 @@
       {% else %}
         <div class="empty-state">No operator activity yet today.</div>
       {% endif %}
+    </div>
+    <div class="all-time-operators">
+      <div class="panel-title compact-title">
+        <div>
+          <span class="eyebrow">All Time</span>
+          <h3>User stats</h3>
+        </div>
+        <strong>{{ activity.all_time_total }}</strong>
+      </div>
+      <div class="operator-histogram">
+        {% if activity.all_user_bars %}
+          {% for item in activity.all_user_bars %}
+            <div class="histogram-column" style="--operator-color: {{ item.color }}; --bar-height: {{ item.percent }}%" title="{{ item.user }} - {{ item.count }} total jobs">
+              <div class="histogram-bar"><span></span></div>
+              <strong>{{ item.count }}</strong>
+              <small>{{ item.user }}</small>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">No all-time activity yet.</div>
+        {% endif %}
+      </div>
     </div>
   </section>
   </div>

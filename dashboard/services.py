@@ -38,6 +38,8 @@ LIVE_ACTION_ACTIVITY = {
     "p2p_test": ("p2p-testing", "P2P Testing", "P2P Switch Test"),
     "single_switch_test": ("p2p-testing", "P2P Testing", "Single Switch Test"),
     "ios_phase1": ("cisco-ios-uploader", "Cisco IOS Uploader", "Cisco IOS Phase 1"),
+    "dealers_access_phase1": ("dealers-access-router", "Access Switch", "Access Switch Phase 1"),
+    "configure_access_switch": ("dealers-access-router", "Access Switch", "Access Switch Configuration"),
 }
 
 ROOT_SWITCHES = [
@@ -174,6 +176,8 @@ def _run_live_tool_job(job_id, action, post):
         "p2p_test": ["Validating input", "Opening Telnet sessions", "Checking VLANs", "Configuring SVIs", "Running ping/drop test", "Cleanup and result"],
         "single_switch_test": ["Validating input", "Opening Telnet session", "Checking VLAN", "Configuring SVI", "Running bidirectional tests", "Cleanup and result"],
         "ios_phase1": ["Validating input", "Opening Telnet", "Running show version", "Running show inventory", "Running dir", "Building Phase 1/2 report"],
+        "dealers_access_phase1": ["Validating access switch inputs", "Opening Telnet", "Running Cisco IOS audit", "Checking CDP neighbors", "Building Phase 1 result"],
+        "configure_access_switch": ["Validating configuration input", "Building Cisco access config", "Opening Telnet", "Entering configuration mode", "Applying commands", "Collecting command result"],
     }.get(action, ["Running job"])
     result = None
     try:
@@ -200,6 +204,8 @@ def _run_live_tool_job(job_id, action, post):
             "p2p_test": run_p2p_test,
             "single_switch_test": run_single_switch_test,
             "ios_phase1": cisco_ios_phase1,
+            "dealers_access_phase1": dealer_access_switch_phase1,
+            "configure_access_switch": configure_access_switch,
         }
         fn = fn_map.get(action)
         if not fn:
@@ -404,12 +410,22 @@ def mac_dashboard_for(switches):
         })
         gradient_parts.append(f"{color} {current:.2f}% {current + pct:.2f}%")
         current += pct
+    updated_values = [row.get("updated_at", "") for row in rows if row.get("updated_at")]
+    latest_updated = max(updated_values) if updated_values else ""
+    latest_display = "Not updated yet"
+    if latest_updated:
+        try:
+            latest_display = datetime.fromisoformat(latest_updated).strftime("%d-%b-%y %H:%M:%S")
+        except ValueError:
+            latest_display = latest_updated
     return {
         "total": total,
         "total_display": format_mac_count(total),
         "rows": rows,
         "pie_segments": pie_segments,
         "pie_gradient": ", ".join(gradient_parts) if gradient_parts else "#26343a 0% 100%",
+        "latest_updated": latest_updated,
+        "latest_updated_display": latest_display,
     }
 
 
@@ -455,6 +471,7 @@ def update_mac_cache_for_switch(ip, username, password):
         "total": dashboard["total_display"],
         "pie_gradient": dashboard["pie_gradient"],
         "pie_segments": dashboard["pie_segments"],
+        "latest_updated_display": dashboard["latest_updated_display"],
     }
 
 
@@ -472,6 +489,7 @@ def update_all_mac_cache(username, password):
         "rows": dashboard["rows"],
         "pie_gradient": dashboard["pie_gradient"],
         "pie_segments": dashboard["pie_segments"],
+        "latest_updated_display": dashboard["latest_updated_display"],
         "dc_dashboard": dc_dashboard,
     }
 
@@ -495,6 +513,7 @@ def overview_activity():
     today = datetime.now().date().isoformat()
     rows = list(reversed(_read_activity()))
     today_rows = [row for row in rows if row.get("time", "").startswith(today)]
+    all_rows = rows
     users = sorted({row.get("user", "unknown") for row in today_rows})
     success_count = sum(1 for row in today_rows if row.get("status") == "success")
     issue_count = sum(1 for row in today_rows if row.get("status") in {"warning", "error"})
@@ -527,6 +546,19 @@ def overview_activity():
         pie_segments.append({"user": user, "count": count, "percent": round(pct), "color": color})
         gradient_parts.append(f"{color} {current:.2f}% {current + pct:.2f}%")
         current += pct
+    all_by_user = {}
+    for row in all_rows:
+        user = row.get("user", "unknown")
+        all_by_user[user] = all_by_user.get(user, 0) + 1
+    max_all_user = max(all_by_user.values()) if all_by_user else 0
+    all_user_bars = []
+    for index, (user, count) in enumerate(sorted(all_by_user.items(), key=lambda item: item[1], reverse=True)):
+        all_user_bars.append({
+            "user": user,
+            "count": count,
+            "percent": round((count / max_all_user * 100) if max_all_user else 0),
+            "color": user_color(user, index),
+        })
     status_total = sum(by_status.values()) or 1
     status_current = 0
     status_colors = {"success": "#42c77b", "warning": "#d9ad35", "error": "#e85b5b", "info": "#5ab0ff"}
@@ -552,6 +584,8 @@ def overview_activity():
         "issue_count": issue_count,
         "users": users,
         "user_count": len(users),
+        "all_time_total": len(all_rows),
+        "all_user_bars": all_user_bars,
         "recent": today_rows[:30],
         "by_tool": by_tool,
         "by_status": by_status,
@@ -1272,6 +1306,19 @@ def telnet_login(ip, username, password, timeout=8):
         return None, f"Telnet error: {exc}"
 
 
+def check_telnet_access(ip, username, password):
+    if not all([ip, username, password]):
+        return False, "Username, password, and switch IP are required."
+    tn, login_msg = telnet_login(ip, username, password)
+    if not tn:
+        return False, login_msg
+    try:
+        tn.close()
+    except Exception:
+        pass
+    return True, "Telnet OK."
+
+
 def telnet_run_commands_fast(ip, username, password, commands, login_timeout=5):
     try:
         tn = telnetlib.Telnet(ip, timeout=8)
@@ -1377,50 +1424,80 @@ def read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=15):
     return output.decode("ascii", errors="ignore")
 
 
+def run_show_interfaces_status(tn, max_wait=30):
+    """Run show interfaces status and keep pressing space until the prompt returns."""
+    try:
+        tn.read_very_eager()
+    except Exception:
+        pass
+    tn.write(b"terminal length 0\r\n")
+    time.sleep(0.5)
+    try:
+        tn.read_very_eager()
+    except Exception:
+        pass
+    tn.write(b"show interfaces status\r\n")
+    output = b""
+    start_time = time.time()
+    prompt_pattern = re.compile(rb"[\r\n][A-Za-z0-9_.:/()-]+[#>]\s*$")
+    while time.time() - start_time <= max_wait:
+        chunk = tn.read_very_eager()
+        if chunk:
+            output += chunk
+            if b"--More--" in chunk or b"More" in chunk:
+                tn.write(b" ")
+            if prompt_pattern.search(output):
+                break
+        time.sleep(0.15)
+    return output.decode("ascii", errors="ignore")
+
+
 def parse_show_interfaces_status(output_text):
     ports = []
     lines = output_text.splitlines()
-    row_pattern = re.compile(
-        r"^\s*(?P<port>(?:Fa|Gi|Te|Eth|Po)\S+)\s+"
-        r"(?P<middle>.*?)"
-        r"(?P<status>connected|notconnect|disabled|suspended|err-disabled)\s+"
-        r"(?P<vlan>\S+)\s+"
-        r"(?P<duplex>\S+)\s+"
-        r"(?P<speed>\S+)\s+"
-        r"(?P<type>\S+)\s*$",
-        re.I,
-    )
-
+    status_values = {"connected", "notconnect", "disabled", "suspended", "err-disabled"}
     for line in lines:
-        match = row_pattern.match(line)
-        if match:
-            row = match.groupdict()
-            ports.append({
-                "port": row.get("port", ""),
-                "name": row.get("middle", "").strip(),
-                "status": row.get("status", ""),
-                "vlan": row.get("vlan", ""),
-                "duplex": row.get("duplex", ""),
-                "speed": row.get("speed", ""),
-                "type": row.get("type", ""),
-            })
+        if not re.match(r"^\s*(Fa|Gi|Te|Eth|Po)\S+", line):
+            continue
+        tokens = line.strip().split()
+        if len(tokens) < 5:
+            continue
+        status_index = None
+        for index, token in enumerate(tokens[1:], start=1):
+            if token.lower() in status_values:
+                status_index = index
+                break
+        if status_index is None or len(tokens) <= status_index + 3:
+            continue
+        ports.append({
+            "port": tokens[0],
+            "name": " ".join(tokens[1:status_index]).strip(),
+            "status": tokens[status_index],
+            "vlan": tokens[status_index + 1],
+            "duplex": tokens[status_index + 2],
+            "speed": tokens[status_index + 3],
+            "type": " ".join(tokens[status_index + 4:]).strip(),
+        })
     if ports:
         return ports
 
     for line in lines:
         if not re.match(r"^\s*(Fa|Gi|Te|Eth|Po)\S+", line):
             continue
-        line = line.strip()
-        parts = re.split(r"\s{2,}", line)
-        if len(parts) >= 7:
+        parts = re.split(r"\s{2,}", line.strip())
+        if len(parts) >= 6:
+            has_name = parts[1].lower() not in status_values
+            status_offset = 2 if has_name else 1
+            if len(parts) <= status_offset + 3:
+                continue
             ports.append({
                 "port": parts[0].strip(),
-                "name": parts[1].strip(),
-                "status": parts[2].strip(),
-                "vlan": parts[3].strip(),
-                "duplex": parts[4].strip() if len(parts) > 4 else "",
-                "speed": parts[5].strip() if len(parts) > 5 else "",
-                "type": parts[6].strip() if len(parts) > 6 else "",
+                "name": parts[1].strip() if has_name else "",
+                "status": parts[status_offset].strip(),
+                "vlan": parts[status_offset + 1].strip(),
+                "duplex": parts[status_offset + 2].strip(),
+                "speed": parts[status_offset + 3].strip(),
+                "type": " ".join(part.strip() for part in parts[status_offset + 4:]),
             })
     return ports
 
@@ -1434,8 +1511,7 @@ def fetch_lastmile_ports(post):
     tn, login_msg = telnet_login(ip, username, password)
     if not tn:
         return message("error", login_msg)
-    tn.write(b"show interfaces status\n")
-    raw = read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=20)
+    raw = run_show_interfaces_status(tn)
     tn.write(b"exit\n")
     tn.close()
     ports = parse_show_interfaces_status(raw)
@@ -1448,8 +1524,7 @@ def fetch_lastmile_port_rows(ip, username, password):
     tn, login_msg = telnet_login(ip, username, password)
     if not tn:
         return False, login_msg, [], ""
-    tn.write(b"show interfaces status\n")
-    raw = read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=20)
+    raw = run_show_interfaces_status(tn)
     tn.write(b"exit\n")
     tn.close()
     ports = parse_show_interfaces_status(raw)
@@ -1532,7 +1607,7 @@ def cisco_ios_phase1(post):
             "OK Switch model detected" if model != "Not detected" else "ERROR Switch model was not detected",
             "OK Flash space detected" if space_match else "ERROR Flash space was not detected",
         ],
-        "raw": raw,
+                "raw": "",
         "ios_report": {
             "device_ip": device_ip,
             "model": model,
@@ -1545,6 +1620,503 @@ def cisco_ios_phase1(post):
             "switch_ios_files": switch_ios_files,
         },
     }
+
+
+def dealer_access_switch_phase1(post):
+    username = post.get("username", "").strip()
+    password = post.get("password", "")
+    switch_ip = post.get("switch_ip", "").strip()
+    if not all([username, password, switch_ip]):
+        return message("error", "Username, password, and switch IP are required.")
+    ip_error = validate_access_switch_ip(switch_ip)
+    if ip_error:
+        return message("error", ip_error)
+
+    ok, login_msg = check_telnet_access(switch_ip, username, password)
+    if not ok:
+        return message("error", login_msg)
+
+    ios_result = cisco_ios_phase1({
+        "username": username,
+        "password": password,
+        "device_ip": switch_ip,
+    })
+    if ios_result.get("kind") != "success":
+        raw = (
+            "ACCESS SWITCH PHASE 1\n"
+            "============================================================\n"
+            f"Switch IP: {switch_ip}\n"
+            f"IOS Status: {ios_result.get('message', 'Cisco IOS audit failed.')}\n"
+        )
+        return {
+            "kind": "error",
+            "message": ios_result.get("message", "Cisco IOS audit failed."),
+            "details": ios_result.get("details", []),
+            "raw": raw,
+            "dealer_switch": {
+                "switch_ip": switch_ip,
+                "ios_decision": {
+                    "required": True,
+                    "status": "audit_failed",
+                    "message": ios_result.get("message", "Cisco IOS audit failed."),
+                    "kind": "error",
+                },
+                "cdp": {"found": False, "noc_switch": False, "message": "CDP check skipped because IOS audit failed.", "raw": "", "clean": ""},
+                "ios_uploader_url": "/tools/cisco-ios-uploader/",
+            },
+        }
+    ios_report = ios_result.get("ios_report") or {}
+    phase2 = ios_report.get("phase2") or {}
+    current_status = phase2.get("current_status")
+    if phase2.get("unsupported"):
+        ios_decision = {
+            "required": True,
+            "status": "unsupported",
+            "message": phase2.get("message") or SUPPORTED_IOS_MODEL_MESSAGE,
+            "kind": "error",
+        }
+    elif current_status == "needs_upgrade":
+        ios_decision = {
+            "required": True,
+            "status": "needs_upgrade",
+            "message": "IOS update required first. Please update IOS before Access Switch configuration.",
+            "kind": "error",
+        }
+    elif current_status == "already_updated":
+        ios_decision = {
+            "required": False,
+            "status": "already_updated",
+            "message": "IOS Already Updated - no need to update IOS.",
+            "kind": "success",
+        }
+    else:
+        ios_decision = {
+            "required": True,
+            "status": current_status or "unknown",
+            "message": phase2.get("message") or "IOS status could not be confirmed. Please verify IOS first.",
+            "kind": "warning",
+        }
+    cdp = fetch_access_switch_cdp(switch_ip, username, password)
+
+    result_kind = "error" if ios_decision["kind"] == "error" else "success"
+    raw = (
+        "ACCESS SWITCH PHASE 1\n"
+        "============================================================\n"
+        f"Switch IP: {switch_ip}\n"
+    )
+    if ios_report:
+        raw += (
+            f"Model: {ios_report.get('model', 'Not detected')}\n"
+            f"Current IOS: {ios_report.get('ios_image', 'Not detected')}\n"
+            f"Flash Space: {ios_report.get('total_space', 'Not detected')}\n"
+        )
+    raw += f"IOS Status: {ios_decision['message']}\n"
+    raw += f"CDP Status: {cdp['message']}\n\nCDP OUTPUT\n{'=' * 60}\n{cdp.get('clean') or cdp['message']}\n"
+    return {
+        "kind": result_kind,
+        "message": "Access Switch Phase 1 completed." if result_kind == "success" else "Access Switch Phase 1 stopped.",
+        "details": [
+            "OK Telnet access successful",
+            ("OK " if ios_decision["kind"] == "success" else "ERROR ") + ios_decision["message"],
+            ("OK " if cdp.get("noc_switch") else "WARNING ") + cdp["message"],
+        ],
+        "raw": "",
+        "dealer_switch": {
+            "switch_ip": switch_ip,
+            "ios_decision": ios_decision,
+            "ios_report": ios_report,
+            "cdp": cdp,
+            "ios_uploader_url": "/tools/cisco-ios-uploader/",
+        },
+    }
+
+
+def parse_vlan_selection(vlans_text):
+    raw = (vlans_text or "").replace(" ", "")
+    if not raw:
+        raise ValueError("VLANs to configure are required.")
+    vlan_numbers = []
+    display_parts = []
+    for part in raw.split(","):
+        if not part:
+            continue
+        if "-" in part:
+            start_text, end_text = part.split("-", 1)
+            if not start_text.isdigit() or not end_text.isdigit():
+                raise ValueError("VLAN range must be numeric, like 203-206.")
+            start, end = int(start_text), int(end_text)
+            if start > end:
+                raise ValueError("VLAN range start cannot be greater than end.")
+            if start < 1 or end > 4094:
+                raise ValueError("VLAN range must be between 1 and 4094.")
+            vlan_numbers.extend(range(start, end + 1))
+            display_parts.append(f"{start}-{end}" if start != end else str(start))
+        else:
+            if not part.isdigit():
+                raise ValueError("VLAN must be numeric.")
+            vlan = int(part)
+            if vlan < 1 or vlan > 4094:
+                raise ValueError("VLAN must be between 1 and 4094.")
+            vlan_numbers.append(vlan)
+            display_parts.append(str(vlan))
+    unique_vlans = []
+    for vlan in vlan_numbers:
+        if vlan not in unique_vlans:
+            unique_vlans.append(vlan)
+    if not unique_vlans:
+        raise ValueError("No valid VLAN was selected.")
+    return unique_vlans, ",".join(display_parts)
+
+
+def parse_uplink_ports(uplink_text):
+    ports = [port.strip() for port in re.split(r"[,;\n]+", uplink_text or "") if port.strip()]
+    unique_ports = []
+    for port in ports:
+        if port not in unique_ports:
+            unique_ports.append(port)
+    if not unique_ports:
+        raise ValueError("Uplink port is required.")
+    if len(unique_ports) > 2:
+        raise ValueError("Maximum 2 uplink ports are allowed.")
+    return unique_ports
+
+
+def access_port_name_like(reference_port, port_number):
+    match = re.match(r"^([A-Za-z]+(?:[A-Za-z-]+)?)(.*?)(\d+)$", reference_port or "")
+    if not match:
+        return f"GigabitEthernet0/{port_number}"
+    prefix, middle, _last = match.groups()
+    return f"{prefix}{middle}{port_number}"
+
+
+def _port_number(port_name):
+    match = re.search(r"(\d+)$", port_name or "")
+    return int(match.group(1)) if match else 0
+
+
+def _build_access_port_block(port, vlan):
+    return [
+        f"interface {port}",
+        f" description PPPoE-{vlan}",
+        f" switchport access vlan {vlan}",
+        " switchport mode access",
+        " storm-control broadcast level 1.00",
+        " storm-control action shutdown",
+        " storm-control action trap",
+        " spanning-tree portfast",
+        " spanning-tree bpdufilter enable",
+        "!",
+    ]
+
+
+def _build_uplink_port_block(port, allowed_vlan_text, description="Main", backup_port=None):
+    lines = [
+        f"interface {port}",
+        f" description {description}",
+        " switchport trunk encapsulation dot1q",
+        f" switchport trunk allowed vlan {allowed_vlan_text}",
+        " switchport mode trunk",
+        " spanning-tree portfast trunk",
+        " spanning-tree bpdufilter enable",
+    ]
+    if backup_port:
+        lines.extend([
+            f" switchport backup interface {backup_port}",
+            f" switchport backup interface {backup_port} preemption mode forced",
+        ])
+    lines.append("!")
+    return lines
+
+
+def _build_shutdown_port_block(port):
+    return [f"interface {port}", " shutdown", "!"]
+
+
+def _render_access_physical_interfaces(reference_port, uplinks, vlans, connected_ports=None):
+    connected_ports = set(connected_ports or [])
+    max_port = max(28, *[_port_number(port) for port in uplinks], *[_port_number(port) for port in connected_ports])
+    access_ports = [access_port_name_like(reference_port, number) for number in range(1, 11)]
+    access_ports = [port for port in access_ports if port not in uplinks]
+    per_vlan = max(1, len(access_ports) // len(vlans))
+    blocks = []
+    index = 0
+    used_ports = set()
+    for vlan_index, vlan in enumerate(vlans):
+        take = per_vlan if vlan_index < len(vlans) - 1 else len(access_ports) - index
+        for _ in range(max(1, take)):
+            if index >= len(access_ports):
+                break
+            port = access_ports[index]
+            blocks.extend(_build_access_port_block(port, vlan))
+            used_ports.add(port)
+            index += 1
+    uplink_numbers = {_port_number(port) for port in uplinks}
+    connected_numbers = {_port_number(port) for port in connected_ports}
+    for number in range(1, max_port + 1):
+        port = access_port_name_like(reference_port, number)
+        if port in used_ports or number in uplink_numbers or number in connected_numbers:
+            continue
+        blocks.extend(_build_shutdown_port_block(port))
+    return blocks, len(used_ports)
+
+
+def _render_full_access_template(template, switch_ip, hostname, vlan_display, vlans, uplinks, connected_ports=None, configure_flex=False):
+    allowed_vlan_text = "2300," + vlan_display
+    lines = template.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+    lines = [re.sub(r"^hostname\s+.+$", f"hostname {hostname}", line) for line in lines]
+    lines = [re.sub(r"^vlan\s+2300\b.*$", f"vlan {allowed_vlan_text}", line) for line in lines]
+    lines = [re.sub(r"^ ip address\s+\S+\s+255\.255\.248\.0$", f" ip address {switch_ip} 255.255.248.0", line) for line in lines]
+    first_interface = next((i for i, line in enumerate(lines) if re.match(r"^interface\s+(?:FastEthernet|GigabitEthernet|Gi|Fa|Ethernet)\S+", line, re.I)), None)
+    vlan_interface = next((i for i, line in enumerate(lines) if re.match(r"^interface\s+Vlan2300\b", line, re.I)), None)
+    access_count = 0
+    if first_interface is not None and vlan_interface is not None and first_interface < vlan_interface:
+        physical_blocks, access_count = _render_access_physical_interfaces(uplinks[0], uplinks, vlans, connected_ports)
+        uplink_blocks = []
+        if configure_flex and len(uplinks) == 2:
+            uplink_blocks.extend(_build_uplink_port_block(uplinks[0], allowed_vlan_text, "Main-Pri", uplinks[1]))
+            uplink_blocks.extend(_build_uplink_port_block(uplinks[1], allowed_vlan_text, "Main-Bkp"))
+        else:
+            for uplink in uplinks:
+                uplink_blocks.extend(_build_uplink_port_block(uplink, allowed_vlan_text))
+        lines = lines[:first_interface] + physical_blocks + uplink_blocks + lines[vlan_interface:]
+    route_line = None
+    ip_obj = ipaddress.ip_address(switch_ip)
+    if ipaddress.ip_address("192.168.200.2") <= ip_obj <= ipaddress.ip_address("192.168.207.255"):
+        route_line = "ip route 192.168.150.0 255.255.255.252 192.168.200.1"
+    elif ipaddress.ip_address("192.168.208.2") <= ip_obj <= ipaddress.ip_address("192.168.215.255"):
+        route_line = "ip route 192.168.160.0 255.255.255.252 192.168.208.1"
+    if route_line:
+        replaced = False
+        new_lines = []
+        for line in lines:
+            if re.match(r"^ip route 192\.168\.(150|160)\.0 255\.255\.255\.252 ", line):
+                if not replaced:
+                    new_lines.append(route_line)
+                    replaced = True
+                continue
+            new_lines.append(line)
+        lines = new_lines
+        if not replaced:
+            ip_classless_index = next((i for i, line in enumerate(lines) if line.strip() == "ip classless"), None)
+            lines.insert((ip_classless_index + 1) if ip_classless_index is not None else len(lines), route_line)
+    commands = [line.rstrip() for line in lines if line.strip()]
+    if commands and commands[0].lower().startswith("version "):
+        commands = commands[1:]
+    if not commands or commands[-1].lower() != "end":
+        commands.append("end")
+    return commands, access_count
+
+
+def build_access_switch_commands(post):
+    template_path = Path(__file__).resolve().parent.parent / "Cisco_Access-Router.txt"
+    template = template_path.read_text(encoding="utf-8", errors="ignore") if template_path.exists() else ""
+    username = post.get("username", "").strip()
+    password = post.get("password", "")
+    switch_ip = post.get("switch_ip", "").strip()
+    switch_type = post.get("switch_type", "Cisco").strip()
+    hostname = post.get("hostname", "").strip()
+    if not all([username, password, switch_ip, switch_type, hostname]):
+        raise ValueError("Username, password, switch IP, switch type, and hostname are required.")
+    ip_error = validate_access_switch_ip(switch_ip)
+    if ip_error:
+        raise ValueError(ip_error)
+    if switch_type.lower() != "cisco":
+        raise ValueError("Mtlink configuration will be added after the Cisco workflow.")
+    vlans, vlan_display = parse_vlan_selection(post.get("vlans", ""))
+    uplinks = parse_uplink_ports(post.get("uplink_port", ""))
+    if not template:
+        raise ValueError("Cisco_Access-Router.txt template file was not found.")
+    connected_ports = [port.strip() for port in (post.get("connected_ports", "") or "").split(",") if port.strip()]
+    configure_flex = post.get("configure_flex", "").lower() == "yes" and len(uplinks) == 2
+    rendered_commands, access_count = _render_full_access_template(template, switch_ip, hostname, vlan_display, vlans, uplinks, connected_ports, configure_flex)
+    commands = ["conf t"] + rendered_commands
+    return commands, {
+        "switch_ip": switch_ip,
+        "hostname": hostname,
+        "vlans": vlan_display,
+        "uplinks": ", ".join(uplinks),
+        "access_ports": access_count,
+        "connected_ports": ", ".join(connected_ports) or "None detected",
+        "flex": "Enabled" if configure_flex else "Disabled",
+        "template_loaded": bool(template),
+        "total_commands": len(commands),
+    }
+
+
+def configure_access_switch(post):
+    try:
+        commands, summary = build_access_switch_commands(post)
+    except ValueError as exc:
+        return message("error", str(exc), [f"ERROR {exc}"])
+    tn, login_msg = telnet_login(summary["switch_ip"], post.get("username", "").strip(), post.get("password", ""))
+    if not tn:
+        return message("error", login_msg, [f"ERROR {login_msg}"])
+    error_outputs = []
+    failed = []
+    try:
+        for command in commands:
+            tn.write((command + "\r\n").encode("ascii", errors="ignore"))
+            time.sleep(0.35)
+            output = tn.read_very_eager().decode("ascii", errors="ignore")
+            clean = output.replace("\r", "")
+            if re.search(r"% ?(Invalid|Incomplete|Ambiguous|Error|Unknown)", clean, re.I):
+                error_lines = [line.strip() for line in clean.splitlines() if re.search(r"%|Invalid|Incomplete|Ambiguous|Error|Unknown", line, re.I)]
+                error_text = "\n".join(error_lines) or (clean.strip().splitlines()[-1] if clean.strip() else "device rejected command")
+                failed.append(f"FAILED: {command} -> {error_text}")
+                error_outputs.append(f"COMMAND: {command}\nERROR: {error_text}")
+        tn.write(b"exit\r\n")
+    finally:
+        try:
+            tn.close()
+        except Exception:
+            pass
+    raw = "\n\n".join(error_outputs) if error_outputs else "No command errors returned by switch."
+    if failed:
+        return {
+            "kind": "warning",
+            "message": f"Access switch configuration completed with {len(failed)} command issue(s).",
+            "details": [
+                f"OK Template loaded: {summary['template_loaded']}",
+                f"OK VLANs prepared: 2300,{summary['vlans']}",
+                f"OK Access ports configured: {summary['access_ports']}",
+                f"OK Uplink port(s): {summary['uplinks']}",
+                f"OK Flex: {summary.get('flex', 'Disabled')}",
+                f"OK Preserved connected port(s): {summary.get('connected_ports', 'None detected')}",
+            ] + failed,
+            "raw": raw,
+        }
+    return {
+        "kind": "success",
+        "message": "Access switch configuration completed successfully.",
+        "details": [
+            f"OK Template loaded: {summary['template_loaded']}",
+            f"OK Hostname set: {summary['hostname']}",
+            f"OK VLANs prepared: 2300,{summary['vlans']}",
+            f"OK Access ports configured: {summary['access_ports']}",
+            f"OK Uplink port(s): {summary['uplinks']}",
+            f"OK Flex: {summary.get('flex', 'Disabled')}",
+            f"OK Preserved connected port(s): {summary.get('connected_ports', 'None detected')}",
+        ],
+        "raw": raw,
+    }
+
+
+def fetch_access_switch_cdp(ip, username, password):
+    tn, login_msg = telnet_login(ip, username, password)
+    if not tn:
+        return {"found": False, "message": login_msg, "raw": ""}
+    try:
+        tn.write(b"terminal length 0\r\n")
+        time.sleep(0.5)
+        try:
+            tn.read_very_eager()
+        except Exception:
+            pass
+        tn.write(b"show cdp neighbors\r\n")
+        raw = read_full_output(tn, end_prompt=b"#", more_prompt=b"--More--", max_wait=20)
+        tn.write(b"exit\r\n")
+        tn.close()
+    except Exception as exc:
+        try:
+            tn.close()
+        except Exception:
+            pass
+        return {"found": False, "message": f"CDP check failed: {exc}", "raw": ""}
+    clean_output, cdp_rows = clean_cdp_neighbors_output(raw)
+    if cdp_rows:
+        if any("JP-Testing_208.4" in row for row in cdp_rows):
+            msg = "This switch is placed in NOC, not on live network."
+            noc_switch = True
+        else:
+            msg = "This switch is installed somewhere on the live network."
+            noc_switch = False
+        return {"found": True, "noc_switch": noc_switch, "message": msg, "raw": raw, "clean": clean_output, "neighbors": cdp_rows}
+    return {
+        "found": False,
+        "noc_switch": False,
+        "message": "This switch is installed somewhere on the live network, or CDP is disabled.",
+        "raw": raw,
+        "clean": "",
+        "neighbors": [],
+    }
+
+
+def clean_cdp_neighbors_output(raw):
+    rows = []
+    formatted_rows = []
+    status_values = re.compile(r"\b(R|S|I|H|P|B|T|D|C|M)(?:\s+(R|S|I|H|P|B|T|D|C|M))*\b", re.I)
+    for raw_line in (raw or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^(show\s+cdp|Capability Codes|Device ID|Local Intrfce|Holdtme|Platform|Port ID|Switch[#>]|[-=]+)", line, re.I):
+            continue
+        if not re.search(r"\b(Gig|Gi|Ten|Te|Fast|Fa|Eth)\s*\S*", line, re.I):
+            continue
+        if not status_values.search(line):
+            continue
+        rows.append(line)
+        match = re.match(r"^(?P<device>\S+)\s+(?P<local>(?:Gig|Gi|Ten|Te|Fast|Fa|Eth)\s*\S+)\s+(?P<hold>\d+)\s+(?P<rest>.+)$", line, re.I)
+        if match:
+            rest = match.group("rest").strip()
+            port_match = re.search(r"\s(?P<port>(?:Gig|Gi|Ten|Te|Fast|Fa|Eth)\s*\S+)\s*$", rest, re.I)
+            port = port_match.group("port") if port_match else ""
+            before_port = rest[:port_match.start()].strip() if port_match else rest
+            tokens = before_port.split()
+            platform_index = next((i for i, token in enumerate(tokens) if re.search(r"(WS-|C\d|N\d)", token, re.I)), len(tokens))
+            capability = " ".join(tokens[:platform_index])
+            platform = " ".join(tokens[platform_index:])
+            formatted_rows.append(
+                f"{match.group('device'):<22}{match.group('local'):<16}{match.group('hold'):<10}{capability:<14}{platform:<12}{port}"
+            )
+        else:
+            formatted_rows.append(line)
+    if not rows:
+        return "", []
+    header = f"{'Device ID':<22}{'Local Intrfce':<16}{'Holdtme':<10}{'Capability':<14}{'Platform':<12}{'Port ID'}"
+    return "\n".join([header] + formatted_rows), rows
+
+
+def validate_access_switch_ip(ip_value):
+    try:
+        ip_obj = ipaddress.ip_address(ip_value)
+    except Exception:
+        return "Switch IP must be a valid IPv4 address."
+    start = ipaddress.ip_address("192.168.200.0")
+    end = ipaddress.ip_address("192.168.215.255")
+    if not (start <= ip_obj <= end):
+        return "Only 192.168.200.0 - 192.168.215.255 is allowed for Access Switch."
+    return ""
+    header = f"{'Device ID':<22}{'Local Intrfce':<16}{'Holdtme':<10}{'Capability':<14}{'Platform':<12}{'Port ID'}"
+    return "\n".join([header] + formatted_rows), rows
+
+
+def validate_dealer_vlan_input(vlans):
+    text = (vlans or "").strip()
+    if not text:
+        return "VLAN input is required."
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if not parts:
+        return "VLAN input is required."
+    for part in parts:
+        if "-" in part:
+            bounds = [item.strip() for item in part.split("-", 1)]
+            if len(bounds) != 2 or not bounds[0].isdigit() or not bounds[1].isdigit():
+                return "VLAN range must look like 203-206."
+            start, end = int(bounds[0]), int(bounds[1])
+            if start > end:
+                return "VLAN range start must be less than or equal to end."
+            for vlan in range(start, end + 1):
+                error = validate_vlan_id(str(vlan))
+                if error:
+                    return f"Invalid VLAN {vlan}: {error}"
+        else:
+            if not part.isdigit():
+                return "Separate VLANs must be numeric, like 203,208,215."
+            error = validate_vlan_id(part)
+            if error:
+                return f"Invalid VLAN {part}: {error}"
+    return ""
 
 
 def generate_acl_commands(acl_name, public_ips, customer_subnet="192.168.20.0 0.0.0.255"):

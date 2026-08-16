@@ -1,0 +1,204 @@
+version 12.2
+no service pad
+
+no service password-encryption
+service sequence-numbers
+!
+hostname <User_Select>
+!
+boot-start-marker
+boot-end-marker
+
+system mtu routing 1500
+vtp domain connect.net.pk
+vtp mode transparent
+ip routing
+no ip dhcp conflict logging
+no ip dhcp ping packets
+!
+no ip igmp snooping
+!
+!
+crypto pki trustpoint TP-self-signed-2198323712
+ enrollment selfsigned
+ subject-name cn=IOS-Self-Signed-Certificate-2198323712
+ revocation-check none
+ rsakeypair TP-self-signed-2198323712
+!
+!
+crypto pki certificate chain TP-self-signed-2198323712
+ certificate self-signed 01
+  30820245 308201AE A0030201 02020101 300D0609 2A864886 F70D0101 04050030
+  31312F30 2D060355 04031326 494F532D 53656C66 2D536967 6E65642D 43657274
+  69666963 6174652D 32313938 33323337 3132301E 170D3933 30333031 30303031
+  33385A17 0D323030 31303130 30303030 305A3031 312F302D 06035504 03132649
+  4F532D53 656C662D 5369676E 65642D43 65727469 66696361 74652D32 31393833
+  32333731 3230819F 300D0609 2A864886 F70D0101 01050003 818D0030 81890281
+  8100B3C9 8C978FBD B30A77C6 F8E98281 974BDE03 7CC804DA 61E8F10E 6468EF29
+  B40EC0C7 4BC290BC BF769130 7C39FE3C D2339EAD D92E9AAC F8DA3EC0 2CA4A135
+  3FD993EF 10873C9B DE86AE33 C1453DDF D761E6CF 7FBEECC6 FFF83FB3 C9681BBA
+  D057F2B2 E97178D5 5D62015F 39AABE65 7AF442A8 CDEF5477 BB211FE5 9B51B423
+  BC430203 010001A3 6D306B30 0F060355 1D130101 FF040530 030101FF 30180603
+  551D1104 11300F82 0D536169 6D615F32 31332E37 332E301F 0603551D 23041830
+  16801476 38D254C6 250AFFCB 1542AF5D 73B25D9B CDD6B030 1D060355 1D0E0416
+  04147638 D254C625 0AFFCB15 42AF5D73 B25D9BCD D6B0300D 06092A86 4886F70D
+  01010405 00038181 005CB469 A3C3A9F0 F6A09AE9 1AE15246 C48D20F9 66B68842
+  73EA26CB EC130105 A3EBF4BE 16F73191 F583E7E6 6DB21481 4E7E5E86 AEEA549D
+  0565301F C52326EB 11757C42 E1AC5664 6BCD2184 DD661E4D 23433143 9D5E51A5
+  ECBE211C A769C423 D5DE633F 373931C9 D95171CE 0D1E678F FA77CB2B D566FC21
+  2C86AC66 9E4080AC 4A
+  quit
+!
+!
+!
+
+errdisable recovery cause udld
+errdisable recovery cause bpduguard
+errdisable recovery cause security-violation
+errdisable recovery cause pagp-flap
+errdisable recovery cause dtp-flap
+errdisable recovery cause link-flap
+errdisable recovery cause gbic-invalid
+errdisable recovery cause l2ptguard
+errdisable recovery cause psecure-violation
+errdisable recovery cause dhcp-rate-limit
+errdisable recovery cause vmps
+errdisable recovery cause storm-control
+errdisable recovery cause arp-inspection
+errdisable recovery cause loopback
+
+
+!
+vlan internal allocation policy ascending
+!
+vlan 2300
+!
+!
+!
+interface GigabitEthernet0/1
+ description PPPoE-3217
+ switchport access vlan 3217
+ switchport mode access
+ storm-control broadcast level 1.00 
+ storm-control action shutdown
+ storm-control action trap
+ spanning-tree portfast
+ spanning-tree bpdufilter enable
+
+!
+interface GigabitEthernet0/2
+shutdown
+!
+
+!
+interface GigabitEthernet0/4
+shutdown
+!
+interface GigabitEthernet0/5
+shutdown
+!
+interface GigabitEthernet0/6
+shutdown
+!
+interface GigabitEthernet0/7
+shutdown
+!
+interface GigabitEthernet0/8
+shutdown
+!
+interface GigabitEthernet0/9
+shutdown
+!
+interface GigabitEthernet0/10
+shutdown
+!
+interface GigabitEthernet0/11
+shutdown
+!
+interface GigabitEthernet0/12
+shutdown
+
+interface GigabitEthernet0/13
+shutdown
+interface GigabitEthernet0/14
+shutdown
+interface GigabitEthernet0/15
+shutdown
+interface GigabitEthernet0/16
+shutdown
+interface GigabitEthernet0/17
+shutdown
+interface GigabitEthernet0/18
+shutdown
+interface GigabitEthernet0/19
+shutdown
+!
+interface GigabitEthernet0/24
+ description Testing_Shut_After_Mount
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 2300
+ switchport mode trunk
+ spanning-tree portfast trunk
+ spanning-tree bpdufilter enable
+!
+interface GigabitEthernet0/25
+ description Main
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 2300
+ switchport mode trunk
+ spanning-tree portfast trunk
+ spanning-tree bpdufilter enable
+!
+interface GigabitEthernet0/26
+ description Main
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 2300
+ switchport mode trunk
+ spanning-tree portfast trunk
+ spanning-tree bpdufilter enable
+!
+interface GigabitEthernet0/27
+shutdown
+!
+interface GigabitEthernet0/28
+shutdown
+
+!
+interface Vlan2300
+ ip address 192.168.213.73 255.255.248.0
+!
+
+!
+ip route 10.101.8.0 255.255.252.0 192.168.208.1
+ip route 192.168.160.0 255.255.255.252 192.168.208.1
+
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps tty
+snmp-server enable traps cluster
+snmp-server enable traps entity
+snmp-server enable traps cpu threshold
+snmp-server enable traps vtp
+snmp-server enable traps vlancreate
+snmp-server enable traps vlandelete
+snmp-server enable traps flash insertion removal
+snmp-server enable traps port-security
+snmp-server enable traps envmon fan shutdown supply temperature status
+snmp-server enable traps config-copy
+snmp-server enable traps config
+snmp-server enable traps hsrp
+snmp-server enable traps bridge newroot topologychange
+snmp-server enable traps stpx inconsistency root-inconsistency loop-inconsistency
+snmp-server enable traps syslog
+snmp-server enable traps rtr
+snmp-server enable traps vlan-membership
+radius-server host 10.101.11.31 auth-port 1812 acct-port 1813 key 7 0130090A550E051B0F636D0A1016141D434D42
+!
+privilege exec level 6 show logging
+privilege exec level 6 ping repeat size
+!
+
+
+!
+ntp clock-period 36029084
+
+end

@@ -1,0 +1,87 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Dealer's Access Switch Configuration | NETWORK-TOOLS{% endblock %}
+{% block heading %}Dealer's Access Switch Configuration{% endblock %}
+{% block content %}
+<section class="tool-page">
+  <form class="panel-form dealer-switch-form access-config-form" method="post" data-access-config-form data-dealer-switch-form data-live-form data-live-start-url="{% url 'dashboard:live_tool_start' %}" data-live-status-url-template="{% url 'dashboard:live_tool_status' 'JOB_ID' %}" data-interface-url="{% url 'dashboard:lastmile_interfaces' %}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="configure_access_switch">
+    <div class="access-config-status {% if access_switch_phase1.cdp_message %}{% if access_switch_phase1.cdp_noc_switch %}good{% else %}bad{% endif %}{% endif %}" data-access-config-status>
+      {{ access_switch_phase1.cdp_message|default:"Phase 1 network/NOC status will appear here." }}
+    </div>
+    <p class="access-config-note">
+      Make sure <a href="http://10.101.11.48/TFTP/Switch" target="_blank" rel="noopener">http://10.101.11.48/TFTP/Switch</a>
+      and <a href="http://10.101.11.48/TFTP/radius" target="_blank" rel="noopener">http://10.101.11.48/TFTP/radius</a>
+      files are running on a switch.
+    </p>
+
+    <div class="form-grid two">
+      <label>Username
+        <input name="username" value="{{ access_switch_phase1.username }}" data-access-config-username autocomplete="username" readonly>
+      </label>
+      <label>Password
+        <input name="password" type="password" value="{{ access_switch_phase1.password }}" data-access-config-password autocomplete="current-password" readonly>
+      </label>
+    </div>
+
+    <label>Switch IP
+      <input name="switch_ip" value="{{ access_switch_phase1.switch_ip }}" data-dealer-switch-ip data-access-config-switch-ip readonly>
+    </label>
+    <div class="field-message" data-dealer-ip-message></div>
+
+    <label>Switch Type
+      <select name="switch_type" data-access-switch-type required>
+        <option value="Cisco">Cisco</option>
+        <option value="Mtlink">Mtlink</option>
+      </select>
+    </label>
+    <div class="field-message access-switch-type-message" data-access-switch-type-message></div>
+
+    <label>VLANs to configure
+      <input name="vlans" data-access-vlans placeholder="203-206 or 203,208,215" required>
+    </label>
+    <div class="field-message" data-access-vlan-message></div>
+
+    <label>Uplink Port
+      <input name="uplink_port" data-dealer-uplink-port placeholder="Select/fill max 2 uplink ports, like Gi0/25 or Gi0/25,Gi0/26" required>
+    </label>
+    <input type="hidden" name="connected_ports" data-connected-ports>
+    <div class="flex-config-box" data-flex-config-box hidden>
+      <strong>Wanna Configure Flex?</strong>
+      <div class="flex-radio-row">
+        <label><input type="radio" name="configure_flex" value="yes"> Yes</label>
+        <label><input type="radio" name="configure_flex" value="no" checked> No</label>
+      </div>
+      <small data-flex-config-summary></small>
+    </div>
+    <button class="secondary-button fetch-ports-button" type="button" data-dealer-port-fetch>Port Fetch</button>
+    <div class="interface-status" data-dealer-port-status>Press Port Fetch to load switch interfaces.</div>
+
+    <div class="port-picker" data-port-picker>
+      <div class="field-heading"><span>Ports</span><span data-dealer-port-count>0 ports</span></div>
+      <div class="port-list" data-dealer-port-list>
+        <div class="empty-state">Port details will appear here after fetch.</div>
+      </div>
+    </div>
+
+    <label>Hostname
+      <input name="hostname" placeholder="Access-SW-Name" required>
+    </label>
+    <button class="primary-button" type="submit">Start Access Switch Configuration</button>
+  </form>
+</section>
+<div class="progress-overlay" data-dealer-progress hidden>
+  <div class="progress-card">
+    <h3>Access Switch Configuration Running</h3>
+    <div class="progress-track"><span data-dealer-progress-bar></span></div>
+    <ol class="progress-steps">
+      <li data-dealer-progress-step>Validating configuration input</li>
+      <li data-dealer-progress-step>Building Cisco access config</li>
+      <li data-dealer-progress-step>Opening Telnet session</li>
+      <li data-dealer-progress-step>Entering configuration mode</li>
+      <li data-dealer-progress-step>Applying commands</li>
+      <li data-dealer-progress-step>Collecting command result</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}

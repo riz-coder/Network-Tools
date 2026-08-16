@@ -1,6 +1,21 @@
 (function () {
   function qs(root, selector) { return root.querySelector(selector); }
   function qsa(root, selector) { return Array.prototype.slice.call(root.querySelectorAll(selector)); }
+  function esc(value) {
+    return String(value || "").replace(/[&<>"']/g, function (char) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"}[char];
+    });
+  }
+  function isAllowedAccessSwitchIp(value) {
+    var parts = String(value || "").trim().split(".");
+    if (parts.length !== 4) return false;
+    var nums = parts.map(function (part) {
+      if (!/^\d+$/.test(part)) return NaN;
+      return Number(part);
+    });
+    if (nums.some(function (num) { return !Number.isInteger(num) || num < 0 || num > 255; })) return false;
+    return nums[0] === 192 && nums[1] === 168 && nums[2] >= 200 && nums[2] <= 215;
+  }
 
   var sidebar = document.getElementById("sidebar");
   var menu = document.getElementById("menuButton");
@@ -49,6 +64,8 @@
     if (!overlay || !bar) return false;
     overlay.hidden = false;
     var card = qs(overlay, ".progress-card");
+    var cardTitle = qs(card, "h3");
+    if (cardTitle && title) cardTitle.textContent = title;
     var liveBox = qs(overlay, "[data-live-job-output]");
     var backButton = qs(overlay, "[data-live-back-button]");
     if (!liveBox) {
@@ -126,6 +143,43 @@
                   backButton.href = "/tools/p2p-testing/";
                   backButton.textContent = "Back to P2P Tool";
                   backButton.hidden = false;
+                } else if (backButton && action === "configure_access_switch") {
+                  backButton.href = "/tools/access-switch/config/";
+                  backButton.textContent = "Back to Access Switch Config";
+                  backButton.classList.remove("secondary-button");
+                  backButton.classList.add("primary-button");
+                  backButton.hidden = false;
+                } else if (backButton && action === "dealers_access_phase1") {
+                  var dealerResult = job.result && job.result.dealer_switch ? job.result.dealer_switch : null;
+                  var dealerSuccess = job.kind === "success" && dealerResult;
+                  var iosRequired = dealerSuccess && dealerResult.ios_decision && dealerResult.ios_decision.required;
+                  if (dealerSuccess) {
+                    try {
+                      window.sessionStorage.setItem("accessSwitchPhase1", JSON.stringify({
+                        username: (qs(form, 'input[name="username"]') || {}).value || "",
+                        password: (qs(form, 'input[name="password"]') || {}).value || "",
+                        switch_ip: dealerResult.switch_ip || ((qs(form, 'input[name="switch_ip"]') || {}).value || ""),
+                        cdp_message: dealerResult.cdp && dealerResult.cdp.message ? dealerResult.cdp.message : "",
+                        cdp_noc_switch: Boolean(dealerResult.cdp && dealerResult.cdp.noc_switch),
+                        ios_required: Boolean(dealerResult.ios_decision && dealerResult.ios_decision.required)
+                      }));
+                    } catch (storageError) {}
+                  }
+                  backButton.classList.remove("secondary-button", "primary-button", "start-config-button");
+                  if (!dealerSuccess) {
+                    backButton.href = "/tools/dealers-access-router/";
+                    backButton.textContent = "Back to Access Switch";
+                    backButton.classList.add("secondary-button");
+                  } else if (iosRequired) {
+                    backButton.href = "/tools/cisco-ios-uploader/";
+                    backButton.textContent = "Open IOS Uploader";
+                    backButton.classList.add("secondary-button");
+                  } else {
+                    backButton.href = "/tools/access-switch/config/";
+                    backButton.textContent = "Start Config";
+                    backButton.classList.add("primary-button", "start-config-button");
+                  }
+                  backButton.hidden = false;
                 }
                 return;
               }
@@ -161,12 +215,27 @@
     if (submitterAction === "show_interface") return;
     var actionInput = qs(form, 'input[name="action"]');
     var action = actionInput ? actionInput.value : "";
+    if (action === "dealers_access_phase1") {
+      var accessIp = qs(form, "[data-dealer-switch-ip]");
+      var accessMsg = qs(form, "[data-dealer-ip-message]");
+      if (!accessIp || !isAllowedAccessSwitchIp(accessIp.value)) {
+        if (accessMsg) {
+          accessMsg.textContent = "Invalid Access Switch IP. Allowed range: 192.168.200.0 - 192.168.215.255.";
+          accessMsg.classList.remove("ok");
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+    }
     var config = {
       "span_vlan": ["[data-progress-overlay]", "[data-progress-bar]", "[data-progress-step]", "VLAN Span Running"],
       "apply_lastmile": ["[data-lastmile-progress]", "[data-lastmile-progress-bar]", "[data-lastmile-progress-step]", "Last-Mile Configuration Running"],
       "p2p_test": ["[data-p2p-progress]", "[data-p2p-progress-bar]", "[data-p2p-progress-step]", "P2P Switch Test Running"],
       "single_switch_test": ["[data-p2p-progress]", "[data-p2p-progress-bar]", "[data-p2p-progress-step]", "Single Switch Test Running"],
-      "ios_phase1": ["[data-ios-progress]", "[data-ios-progress-bar]", "[data-ios-progress-step]", "Cisco IOS Phase 1 Running"]
+      "ios_phase1": ["[data-ios-progress]", "[data-ios-progress-bar]", "[data-ios-progress-step]", "Cisco IOS Phase 1 Running"],
+      "dealers_access_phase1": ["[data-dealer-progress]", "[data-dealer-progress-bar]", "[data-dealer-progress-step]", "Access Switch Phase 1 Running"],
+      "configure_access_switch": ["[data-dealer-progress]", "[data-dealer-progress-bar]", "[data-dealer-progress-step]", "Access Switch Configuration Running"]
     }[action];
     if (!config) return;
     event.preventDefault();
@@ -658,6 +727,7 @@
     var dcMacTotal = document.querySelector("[data-dc-mac-total]");
     var dcMacLegend = document.querySelector("[data-dc-mac-pie-legend]");
     var dcMacTooltip = document.querySelector("[data-dc-mac-slice-tooltip]");
+    var dcMacUpdated = document.querySelector("[data-dc-mac-updated]");
     var macTooltip = qs(macDashboard, "[data-mac-slice-tooltip]");
     var macUpdateAllForm = qs(macDashboard, "[data-mac-update-all-form]");
     var macUpdateStatus = qs(macDashboard, "[data-mac-update-status]");
@@ -745,10 +815,11 @@
         + '<small>' + (item.utilization || "N/A") + ' utilized</small>'
         + '</span>';
     }
-    function updateMacPanel(pie, totalNode, legendNode, dashboardData) {
+    function updateMacPanel(pie, totalNode, legendNode, updatedNode, dashboardData) {
       if (!dashboardData) return;
       if (pie && dashboardData.pie_gradient) pie.style.background = "conic-gradient(" + dashboardData.pie_gradient + ")";
       if (totalNode && dashboardData.total_display) totalNode.textContent = dashboardData.total_display;
+      if (updatedNode && dashboardData.latest_updated_display) updatedNode.textContent = dashboardData.latest_updated_display;
       if (legendNode && dashboardData.pie_segments) {
         legendNode.innerHTML = dashboardData.pie_segments.length ? dashboardData.pie_segments.map(function (item) {
           return renderMacLegendItem(item);
@@ -788,7 +859,7 @@
                 return renderMacLegendItem(item);
               }).join("") : "<span><i></i>No MAC data yet</span>";
             }
-            updateMacPanel(dcMacPie, dcMacTotal, dcMacLegend, data.dc_dashboard);
+            updateMacPanel(dcMacPie, dcMacTotal, dcMacLegend, dcMacUpdated, data.dc_dashboard);
             if (data.dc_dashboard && data.dc_dashboard.pie_segments) setDcMacSegments(data.dc_dashboard.pie_segments);
             if (data.pie_segments) setMacSegments(data.pie_segments);
           })
@@ -858,6 +929,259 @@
           });
       });
     });
+  }
+
+  var dealerForm = document.querySelector("[data-dealer-switch-form]");
+  if (dealerForm) {
+    var dealerUsername = qs(dealerForm, 'input[name="username"]');
+    var dealerPassword = qs(dealerForm, 'input[name="password"]');
+    var dealerSwitchIp = qs(dealerForm, "[data-dealer-switch-ip]");
+    var dealerIpMessage = qs(dealerForm, "[data-dealer-ip-message]");
+    var dealerSubmit = qs(dealerForm, "[data-dealer-submit]");
+    var dealerUplink = qs(dealerForm, "[data-dealer-uplink-port]");
+    var dealerPortButton = qs(dealerForm, "[data-dealer-port-fetch]");
+    var dealerPortStatus = qs(dealerForm, "[data-dealer-port-status]");
+    var dealerPortList = qs(dealerForm, "[data-dealer-port-list]");
+    var dealerPortCount = qs(dealerForm, "[data-dealer-port-count]");
+    var accessConfigStatus = qs(dealerForm, "[data-access-config-status]");
+    var accessSwitchType = qs(dealerForm, "[data-access-switch-type]");
+    var accessSwitchTypeMessage = qs(dealerForm, "[data-access-switch-type-message]");
+    var accessVlans = qs(dealerForm, "[data-access-vlans]");
+    var accessVlanMessage = qs(dealerForm, "[data-access-vlan-message]");
+    var connectedPortsInput = qs(dealerForm, "[data-connected-ports]");
+    var flexConfigBox = qs(dealerForm, "[data-flex-config-box]");
+    var flexConfigSummary = qs(dealerForm, "[data-flex-config-summary]");
+    var isAccessConfigForm = dealerForm.hasAttribute("data-access-config-form");
+    if (isAccessConfigForm) {
+      try {
+        var savedAccessConfig = JSON.parse(window.sessionStorage.getItem("accessSwitchPhase1") || "{}");
+        if (savedAccessConfig.username && dealerUsername) dealerUsername.value = savedAccessConfig.username;
+        if (savedAccessConfig.password && dealerPassword) dealerPassword.value = savedAccessConfig.password;
+        if (savedAccessConfig.switch_ip && dealerSwitchIp) dealerSwitchIp.value = savedAccessConfig.switch_ip;
+        if (accessConfigStatus) {
+          accessConfigStatus.textContent = savedAccessConfig.cdp_message || "Phase 1 network/NOC status was not found. Run Phase 1 again if needed.";
+          accessConfigStatus.classList.toggle("good", Boolean(savedAccessConfig.cdp_noc_switch));
+          accessConfigStatus.classList.toggle("bad", savedAccessConfig.cdp_noc_switch === false && Boolean(savedAccessConfig.cdp_message));
+        }
+      } catch (storageError) {
+        if (accessConfigStatus) {
+          accessConfigStatus.textContent = "Phase 1 details could not be loaded. Run Phase 1 again if needed.";
+          accessConfigStatus.classList.add("bad");
+        }
+      }
+    }
+
+    function setDealerStatus(node, kind, text) {
+      if (!node) return;
+      node.classList.remove("loading", "success", "error");
+      if (kind) node.classList.add(kind);
+      node.textContent = text;
+    }
+    function validateAccessVlans() {
+      if (!isAccessConfigForm || !accessVlans) return true;
+      var value = accessVlans.value.trim().replace(/\s+/g, "");
+      var error = "";
+      if (!value) {
+        error = "VLAN input is required.";
+      } else if (!/^[0-9,-]+$/.test(value)) {
+        error = "Only numbers, comma, and dash are allowed. Example: 203-206 or 203,208,215.";
+      } else {
+        value.split(",").filter(Boolean).some(function (part) {
+          if (part.indexOf("-") >= 0) {
+            var bounds = part.split("-");
+            if (bounds.length !== 2 || !bounds[0] || !bounds[1]) {
+              error = "VLAN range must look like 203-206.";
+              return true;
+            }
+            var start = Number(bounds[0]);
+            var end = Number(bounds[1]);
+            if (!Number.isInteger(start) || !Number.isInteger(end)) {
+              error = "VLAN range must be numeric.";
+              return true;
+            }
+            if (start > end) {
+              error = "VLAN range start must be less than or equal to end.";
+              return true;
+            }
+            if (start < 1 || end > 4094) {
+              error = "VLAN range must be between 1 and 4094.";
+              return true;
+            }
+          } else {
+            var vlan = Number(part);
+            if (!Number.isInteger(vlan) || vlan < 1 || vlan > 4094) {
+              error = "Each VLAN must be between 1 and 4094.";
+              return true;
+            }
+          }
+          return false;
+        });
+      }
+      if (accessVlanMessage) {
+        accessVlanMessage.textContent = error || "VLAN input is valid.";
+        accessVlanMessage.classList.toggle("ok", !error);
+      }
+      return !error;
+    }
+    function selectedUplinkPorts() {
+      return dealerUplink ? dealerUplink.value.split(",").map(function (port) { return port.trim(); }).filter(Boolean) : [];
+    }
+    function updateFlexOption() {
+      if (!isAccessConfigForm || !flexConfigBox) return;
+      var ports = selectedUplinkPorts();
+      var showFlex = ports.length === 2;
+      flexConfigBox.hidden = !showFlex;
+      if (showFlex && flexConfigSummary) {
+        flexConfigSummary.textContent = ports[0] + " will be Primary and " + ports[1] + " will be Backup if Yes is selected.";
+      }
+      if (!showFlex) {
+        qsa(flexConfigBox, 'input[name="configure_flex"]').forEach(function (radio) {
+          radio.checked = radio.value === "no";
+        });
+      }
+    }
+    function validateDealerForm() {
+      var ok = Boolean(dealerUsername.value.trim() && dealerPassword.value && isAllowedAccessSwitchIp(dealerSwitchIp.value));
+      if (isAccessConfigForm && accessSwitchType && accessSwitchType.value.toLowerCase() === "mtlink") {
+        ok = false;
+        if (accessSwitchTypeMessage) {
+          accessSwitchTypeMessage.textContent = "Mtlink coming soon. Only Cisco is available at the moment.";
+          accessSwitchTypeMessage.classList.remove("ok");
+        }
+      } else if (accessSwitchTypeMessage) {
+        accessSwitchTypeMessage.textContent = "";
+      }
+      if (dealerIpMessage) {
+        if (!dealerSwitchIp.value.trim()) {
+          dealerIpMessage.textContent = "Only 192.168.200.0 - 192.168.215.255 is allowed.";
+          dealerIpMessage.classList.remove("ok");
+        } else if (!isAllowedAccessSwitchIp(dealerSwitchIp.value)) {
+          dealerIpMessage.textContent = "Invalid Access Switch IP. Allowed range: 192.168.200.0 - 192.168.215.255.";
+          dealerIpMessage.classList.remove("ok");
+        } else {
+          dealerIpMessage.textContent = "Access Switch IP is valid.";
+          dealerIpMessage.classList.add("ok");
+        }
+      }
+      if (dealerSubmit) {
+        dealerSubmit.classList.toggle("valid", ok);
+        dealerSubmit.classList.toggle("invalid", !ok);
+      }
+      return ok && validateAccessVlans();
+    }
+    function dealerBody() {
+      var body = new URLSearchParams();
+      body.append("username", dealerUsername.value.trim());
+      body.append("password", dealerPassword.value);
+      body.append("switch_ip", dealerSwitchIp.value.trim());
+      body.append("lastmile_ip", dealerSwitchIp.value.trim());
+      body.append("csrfmiddlewaretoken", qs(dealerForm, 'input[name="csrfmiddlewaretoken"]').value);
+      return body;
+    }
+    function renderDealerPorts(ports) {
+      if (!dealerPortList) return;
+      dealerPortList.innerHTML = "";
+      if (dealerPortCount) dealerPortCount.textContent = (ports || []).length + " ports";
+      if (!ports || !ports.length) {
+        dealerPortList.innerHTML = '<div class="empty-state">No ports found.</div>';
+        return;
+      }
+      ports.forEach(function (port) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "port-option";
+        button.dataset.port = port.port || "";
+        button.innerHTML =
+          '<strong>' + esc(port.port || "") + "</strong>" +
+          '<span class="port-name">' + esc(port.name || "No Description") + "</span>" +
+          '<span class="port-meta status-' + esc((port.status || "").toLowerCase().replace(/[^a-z0-9-]/g, "")) + '">' + esc(port.status || "Unknown") + "</span>" +
+          '<span class="port-meta">' + esc(port.vlan || "N/A") + "</span>" +
+          '<span class="port-meta">' + esc(port.duplex || "") + "</span>" +
+          '<span class="port-meta">' + esc(port.speed || "") + "</span>" +
+          '<span class="port-meta">' + esc(port.type || "") + "</span>";
+        dealerPortList.appendChild(button);
+      });
+    }
+    if (dealerPortButton) {
+      dealerPortButton.addEventListener("click", function () {
+        if (!dealerUsername.value.trim() || !dealerPassword.value || !dealerSwitchIp.value.trim()) {
+          setDealerStatus(dealerPortStatus, "", "Enter username, password, and switch IP first.");
+          return;
+        }
+        setDealerStatus(dealerPortStatus, "loading", "Checking Telnet and fetching complete port list...");
+        dealerPortButton.disabled = true;
+        renderDealerPorts([]);
+        fetch(dealerForm.dataset.interfaceUrl, { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" }, body: dealerBody() })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            renderDealerPorts(data.ports || []);
+            if (connectedPortsInput) {
+              connectedPortsInput.value = (data.ports || []).filter(function (port) {
+                return String(port.status || "").toLowerCase() === "connected";
+              }).map(function (port) { return port.port || ""; }).filter(Boolean).join(",");
+            }
+            setDealerStatus(dealerPortStatus, data.ok ? "success" : "error", data.message || "Port fetch complete.");
+          })
+          .catch(function (error) {
+            renderDealerPorts([]);
+            setDealerStatus(dealerPortStatus, "error", "Port fetch failed: " + error.message);
+          })
+          .finally(function () {
+            dealerPortButton.disabled = false;
+          });
+      });
+    }
+    if (dealerPortList) {
+      dealerPortList.addEventListener("click", function (event) {
+        var row = event.target.closest(".port-option");
+        if (!row) return;
+        if (!isAccessConfigForm) {
+          qsa(dealerPortList, ".port-option").forEach(function (item) { item.classList.remove("selected"); });
+          row.classList.add("selected");
+          if (dealerUplink) dealerUplink.value = row.dataset.port || "";
+          return;
+        }
+        if (!dealerUplink) return;
+        var portName = row.dataset.port || "";
+        var selectedPorts = dealerUplink.value.split(",").map(function (port) { return port.trim(); }).filter(Boolean);
+        var exists = selectedPorts.indexOf(portName);
+        if (exists >= 0) {
+          selectedPorts.splice(exists, 1);
+          row.classList.remove("selected");
+        } else {
+          if (selectedPorts.length >= 2) {
+            setDealerStatus(dealerPortStatus, "error", "Maximum 2 uplink ports can be selected.");
+            return;
+          }
+          selectedPorts.push(portName);
+          row.classList.add("selected");
+        }
+        dealerUplink.value = selectedPorts.join(",");
+        setDealerStatus(dealerPortStatus, selectedPorts.length ? "success" : "", selectedPorts.length ? "Selected uplink port(s): " + selectedPorts.join(", ") : "Select max 2 uplink ports.");
+        updateFlexOption();
+      });
+    }
+    [dealerUsername, dealerPassword, dealerSwitchIp].forEach(function (field) {
+      field.addEventListener("input", validateDealerForm);
+      field.addEventListener("change", validateDealerForm);
+    });
+    if (accessSwitchType) accessSwitchType.addEventListener("change", validateDealerForm);
+    if (accessVlans) {
+      accessVlans.addEventListener("input", validateDealerForm);
+      accessVlans.addEventListener("change", validateDealerForm);
+    }
+    if (dealerUplink) {
+      dealerUplink.addEventListener("input", updateFlexOption);
+      dealerUplink.addEventListener("change", updateFlexOption);
+    }
+    dealerForm.addEventListener("submit", function (event) {
+      if (!validateDealerForm()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+    validateDealerForm();
+    updateFlexOption();
   }
 
   var lastmileForm = document.querySelector("[data-lastmile-form]");
