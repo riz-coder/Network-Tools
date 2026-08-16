@@ -120,6 +120,9 @@
               <div class="histogram-bar"><span></span></div>
               <strong>{{ item.count }}</strong>
               <small>{{ item.user }}</small>
+              {% if item.login_by %}
+                <small class="login-by-label">login by {{ item.login_by }}</small>
+              {% endif %}
             </div>
           {% endfor %}
         {% else %}

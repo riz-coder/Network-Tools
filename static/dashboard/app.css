@@ -2276,6 +2276,11 @@ html, body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.histogram-column .login-by-label {
+  max-width: 86px;
+  color: var(--accent);
+  font-size: 9px;
+}
 
 /* Light theme */
 body.light-theme {

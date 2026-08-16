@@ -229,7 +229,7 @@ def _run_live_tool_job(job_id, action, post):
     activity_info = LIVE_ACTION_ACTIVITY.get(action)
     if activity_info:
         tool_slug, tool_name, activity_action = activity_info
-        log_activity(post.get("username", "").strip(), tool_slug, tool_name, activity_action, result)
+        log_activity(post.get("username", "").strip(), tool_slug, tool_name, activity_action, result, post.get("login_user", "").strip())
 
 
 def _read_activity():
@@ -494,10 +494,11 @@ def update_all_mac_cache(username, password):
     }
 
 
-def log_activity(username, tool_slug, tool_name, action, result):
+def log_activity(username, tool_slug, tool_name, action, result, login_user=None):
     entry = {
         "time": datetime.now().isoformat(timespec="seconds"),
         "user": username or "unknown",
+        "login_user": login_user or username or "unknown",
         "tool_slug": tool_slug,
         "tool_name": tool_name,
         "action": action,
@@ -547,9 +548,14 @@ def overview_activity():
         gradient_parts.append(f"{color} {current:.2f}% {current + pct:.2f}%")
         current += pct
     all_by_user = {}
+    all_login_by_user = {}
     for row in all_rows:
         user = row.get("user", "unknown")
         all_by_user[user] = all_by_user.get(user, 0) + 1
+        login_user = row.get("login_user") or ""
+        if login_user and login_user != user:
+            all_login_by_user.setdefault(user, {})
+            all_login_by_user[user][login_user] = all_login_by_user[user].get(login_user, 0) + 1
     max_all_user = max(all_by_user.values()) if all_by_user else 0
     all_user_bars = []
     for index, (user, count) in enumerate(sorted(all_by_user.items(), key=lambda item: item[1], reverse=True)):
@@ -558,6 +564,9 @@ def overview_activity():
             "count": count,
             "percent": round((count / max_all_user * 100) if max_all_user else 0),
             "color": user_color(user, index),
+            "login_by": ", ".join(
+                login for login, _count in sorted(all_login_by_user.get(user, {}).items(), key=lambda item: item[1], reverse=True)[:2]
+            ),
         })
     status_total = sum(by_status.values()) or 1
     status_current = 0

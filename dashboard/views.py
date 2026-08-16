@@ -158,6 +158,7 @@ def tool(request, tool_slug):
                         "dealers_access_phase1": "Access Switch Phase 1",
                     }.get(action, action),
                     result,
+                    request.user.username,
                 )
         except Exception as exc:
             result = services.message("error", f"Unhandled error: {exc}")
@@ -223,7 +224,9 @@ def live_tool_start(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "message": "POST required."}, status=405)
     action = request.POST.get("action", "")
-    job_id = services.start_live_tool_job(action, request.POST)
+    live_post = request.POST.copy()
+    live_post["login_user"] = request.user.username
+    job_id = services.start_live_tool_job(action, live_post)
     return JsonResponse({"ok": True, "job_id": job_id})
 
 
